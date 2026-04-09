@@ -17,15 +17,8 @@ STRINGS = {
     "chart_type": "סוג גרף",
     "slide_num": "שקף",
     "error_render": "שגיאה ברינדור השקף",
-    "error_no_libreoffice": "LibreOffice לא מותקן. התקן עם: brew install --cask libreoffice",
     "changes_saved": "השינויים נשמרו בהצלחה",
     "editing_info": "ערוך את הנתונים בטבלה ולחץ 'עדכן תצוגה' לראות את השינויים",
-    "batch_add": "הוספת שורה לכל הגרפים",
-    "csv_export": "ייצוא CSV",
-    "csv_import": "ייבוא CSV",
-    "before": "לפני",
-    "after": "אחרי",
-    "comparison": "השוואה לפני/אחרי",
 }
 
 

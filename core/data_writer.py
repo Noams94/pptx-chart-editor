@@ -10,7 +10,7 @@ from pptx.chart.data import CategoryChartData, XyChartData
 from pptx.oxml.ns import qn
 from lxml import etree
 
-from core.data_extractor import _is_percentage_format
+from core.data_extractor import is_percentage_format
 
 
 def _display_to_raw(df: pd.DataFrame, series_formats: dict) -> pd.DataFrame:
@@ -21,7 +21,7 @@ def _display_to_raw(df: pd.DataFrame, series_formats: dict) -> pd.DataFrame:
     raw_df = df.copy()
     for col in df.columns[1:]:  # Skip first column (categories)
         fmt = series_formats.get(col, "General")
-        if _is_percentage_format(fmt):
+        if is_percentage_format(fmt):
             raw_df[col] = df[col].apply(
                 lambda v: v / 100.0 if pd.notna(v) else None
             )

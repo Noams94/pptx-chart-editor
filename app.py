@@ -5,12 +5,13 @@ Features: thumbnail navigation, before/after comparison, CSV import/export,
 batch row addition across all charts.
 """
 
+from collections import defaultdict
 import io
 
 import pandas as pd
 import streamlit as st
 
-from core.data_extractor import extract_all_charts, _is_percentage_format
+from core.data_extractor import extract_all_charts, is_percentage_format
 from core.data_writer import update_chart_data
 from core.slide_renderer import render_slides
 from ui.rtl_support import STRINGS, inject_rtl_css
@@ -26,6 +27,15 @@ inject_rtl_css()
 
 st.title(STRINGS["page_title"])
 
+
+def get_chart_df(chart_info):
+    """Get current DataFrame for a chart (edited version if exists, otherwise original)."""
+    key = (chart_info.slide_index, chart_info.shape_name)
+    if key in st.session_state.edited_data:
+        return st.session_state.edited_data[key].copy()
+    return chart_info.dataframe.copy()
+
+
 # --- File Upload ---
 uploaded_file = st.file_uploader(
     STRINGS["upload_label"],
@@ -38,19 +48,21 @@ if uploaded_file is None:
     st.stop()
 
 # --- Initialize Session State ---
-file_bytes = uploaded_file.getvalue()
 if "pptx_bytes" not in st.session_state or st.session_state.get("file_name") != uploaded_file.name:
-    st.session_state.pptx_bytes = file_bytes
-    st.session_state.original_bytes = file_bytes  # Keep original for comparison
+    st.session_state.pptx_bytes = uploaded_file.getvalue()
     st.session_state.file_name = uploaded_file.name
     st.session_state.slide_images = None
     st.session_state.original_slide_images = None
     st.session_state.edited_data = {}
     st.session_state.selected_slide = None
     st.session_state.show_comparison = False
+    st.session_state.charts_cache = None
 
-# --- Extract Charts ---
-charts = extract_all_charts(st.session_state.pptx_bytes)
+# --- Extract Charts (cached in session state) ---
+if st.session_state.get("charts_cache") is None:
+    st.session_state.charts_cache = extract_all_charts(st.session_state.pptx_bytes)
+
+charts = st.session_state.charts_cache
 
 if not charts:
     st.warning(STRINGS["no_charts"])
@@ -66,19 +78,19 @@ if st.session_state.slide_images is None:
             st.error(str(e))
             st.stop()
 
+# --- Group charts by slide (computed once) ---
+charts_by_slide = defaultdict(list)
+for c in charts:
+    charts_by_slide[c.slide_index].append(c)
+
 # --- Sidebar: Slide Thumbnails ---
 with st.sidebar:
     st.subheader("שקפים")
 
-    # Get unique slide indices that have charts
-    slide_indices = sorted(set(c.slide_index for c in charts))
-
-    for slide_idx in slide_indices:
-        slide_charts = [c for c in charts if c.slide_index == slide_idx]
-        chart_count = len(slide_charts)
+    for slide_idx in sorted(charts_by_slide):
+        chart_count = len(charts_by_slide[slide_idx])
 
         if slide_idx < len(st.session_state.slide_images):
-            # Show thumbnail
             is_selected = st.session_state.selected_slide == slide_idx
             label = f"שקף {slide_idx + 1} ({chart_count} גרפים)"
 
@@ -120,19 +132,18 @@ if not chart_options:
 selected_label = st.selectbox(STRINGS["select_chart"], options=list(chart_options.keys()))
 selected_idx = chart_options[selected_label]
 selected_chart = charts[selected_idx]
+slide_idx = selected_chart.slide_index
 
 # --- Tabs: Edit / Batch Add ---
 tab_edit, tab_batch, tab_csv = st.tabs(["עריכת גרף", "הוספת שורה לכל הגרפים", "ייבוא/ייצוא CSV"])
 
 # ==================== TAB 1: EDIT ====================
 with tab_edit:
-    # --- Comparison toggle ---
     col_toggle, _ = st.columns([1, 3])
     with col_toggle:
         show_comparison = st.checkbox("השוואה לפני/אחרי", value=st.session_state.show_comparison)
         st.session_state.show_comparison = show_comparison
 
-    # --- Split Screen Layout ---
     if show_comparison:
         col_before, col_after, col_editor = st.columns([1, 1, 1], gap="medium")
     else:
@@ -143,7 +154,6 @@ with tab_edit:
     if col_before is not None:
         with col_before:
             st.subheader("לפני")
-            slide_idx = selected_chart.slide_index
             if st.session_state.original_slide_images and slide_idx < len(st.session_state.original_slide_images):
                 st.image(
                     st.session_state.original_slide_images[slide_idx],
@@ -153,7 +163,6 @@ with tab_edit:
     # After (current)
     with col_after:
         st.subheader("אחרי" if show_comparison else STRINGS["slide_preview"])
-        slide_idx = selected_chart.slide_index
         if slide_idx < len(st.session_state.slide_images):
             st.image(
                 st.session_state.slide_images[slide_idx],
@@ -170,7 +179,7 @@ with tab_edit:
 
         pct_cols = [
             col for col in selected_chart.dataframe.columns[1:]
-            if _is_percentage_format(selected_chart.series_formats.get(col, ""))
+            if is_percentage_format(selected_chart.series_formats.get(col, ""))
         ]
         if pct_cols:
             st.caption(f"עמודות באחוזים: {', '.join(pct_cols)} (הזן 67 עבור 67%)")
@@ -179,13 +188,8 @@ with tab_edit:
         editor_key = f"editor_{selected_chart.slide_index}_{selected_chart.shape_name}"
         chart_key = (selected_chart.slide_index, selected_chart.shape_name)
 
-        if chart_key in st.session_state.edited_data:
-            current_df = st.session_state.edited_data[chart_key]
-        else:
-            current_df = selected_chart.dataframe.copy()
-
         edited_df = st.data_editor(
-            current_df,
+            get_chart_df(selected_chart),
             num_rows="dynamic",
             use_container_width=True,
             key=editor_key,
@@ -193,7 +197,6 @@ with tab_edit:
 
         st.session_state.edited_data[chart_key] = edited_df
 
-        # Update Preview button
         if st.button(STRINGS["update_preview"], type="primary", use_container_width=True):
             with st.spinner(STRINGS["rendering"]):
                 try:
@@ -207,12 +210,12 @@ with tab_edit:
                     )
                     st.session_state.pptx_bytes = updated_bytes
                     st.session_state.slide_images = render_slides(updated_bytes)
+                    st.session_state.charts_cache = None  # Invalidate cache
                     st.success(STRINGS["changes_saved"])
                     st.rerun()
                 except Exception as e:
                     st.error(f"{STRINGS['error_render']}: {e}")
 
-        # Download button
         st.download_button(
             label=STRINGS["download"],
             data=st.session_state.pptx_bytes,
@@ -238,24 +241,16 @@ with tab_batch:
                     current_bytes = st.session_state.pptx_bytes
 
                     for chart_info in charts:
-                        chart_key = (chart_info.slide_index, chart_info.shape_name)
+                        df = get_chart_df(chart_info)
 
-                        # Get current data (edited or original)
-                        if chart_key in st.session_state.edited_data:
-                            df = st.session_state.edited_data[chart_key].copy()
-                        else:
-                            df = chart_info.dataframe.copy()
-
-                        # Add new row
                         new_row = {df.columns[0]: new_category}
                         for col in df.columns[1:]:
                             new_row[col] = None
                         df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
 
-                        # Store edited data
+                        chart_key = (chart_info.slide_index, chart_info.shape_name)
                         st.session_state.edited_data[chart_key] = df
 
-                        # Update PPTX
                         current_bytes = update_chart_data(
                             current_bytes,
                             chart_info.slide_index,
@@ -267,6 +262,7 @@ with tab_batch:
 
                     st.session_state.pptx_bytes = current_bytes
                     st.session_state.slide_images = render_slides(current_bytes)
+                    st.session_state.charts_cache = None
                     st.success(f"שורה '{new_category}' נוספה ל-{len(charts)} גרפים")
                     st.rerun()
                 except Exception as e:
@@ -283,13 +279,7 @@ with tab_csv:
         st.markdown("**ייצוא נתוני הגרף הנוכחי**")
         st.caption(f"גרף: {selected_chart.shape_name} (שקף {selected_chart.slide_index + 1})")
 
-        chart_key = (selected_chart.slide_index, selected_chart.shape_name)
-        if chart_key in st.session_state.edited_data:
-            export_df = st.session_state.edited_data[chart_key]
-        else:
-            export_df = selected_chart.dataframe.copy()
-
-        # Export to CSV with BOM for Excel Hebrew support
+        export_df = get_chart_df(selected_chart)
         csv_buffer = io.StringIO()
         export_df.to_csv(csv_buffer, index=False, encoding="utf-8")
         csv_bytes = ("\ufeff" + csv_buffer.getvalue()).encode("utf-8")
@@ -316,12 +306,10 @@ with tab_csv:
             try:
                 imported_df = pd.read_csv(csv_file, encoding="utf-8-sig")
 
-                # Validate column count
                 expected_cols = len(selected_chart.dataframe.columns)
                 if len(imported_df.columns) != expected_cols:
                     st.error(f"מספר העמודות לא תואם: צפוי {expected_cols}, נמצא {len(imported_df.columns)}")
                 else:
-                    # Rename columns to match original
                     imported_df.columns = selected_chart.dataframe.columns
 
                     st.markdown("**תצוגה מקדימה:**")
@@ -342,6 +330,7 @@ with tab_csv:
                             )
                             st.session_state.pptx_bytes = updated_bytes
                             st.session_state.slide_images = render_slides(updated_bytes)
+                            st.session_state.charts_cache = None
                             st.success("הנתונים יובאו בהצלחה")
                             st.rerun()
             except Exception as e:

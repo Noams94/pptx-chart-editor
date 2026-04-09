@@ -203,22 +203,3 @@ def _pdf_to_pngs_sips(pdf_path: str, outdir: str) -> list[bytes]:
         if os.path.exists(out_path):
             return [Path(out_path).read_bytes()]
         raise RuntimeError("Could not convert PDF to PNG")
-
-
-def render_single_slide(pptx_bytes: bytes, slide_index: int) -> bytes | None:
-    """Render a single slide to PNG.
-
-    Args:
-        pptx_bytes: Raw bytes of the .pptx file
-        slide_index: Zero-based slide index
-
-    Returns:
-        PNG image bytes, or None if rendering failed
-    """
-    try:
-        images = render_slides(pptx_bytes)
-        if slide_index < len(images):
-            return images[slide_index]
-        return None
-    except Exception:
-        return None

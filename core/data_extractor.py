@@ -23,7 +23,7 @@ XY_CHART_TYPES = {
 }
 
 
-def _is_percentage_format(fmt: str) -> bool:
+def is_percentage_format(fmt: str) -> bool:
     """Check if a format code represents percentages (e.g., '0%', '0.0%', '#,##0%')."""
     if not fmt:
         return False
@@ -70,14 +70,13 @@ class ChartInfo:
     chart_type: int
     chart_type_name: str
     dataframe: pd.DataFrame          # Display values (67 for 67%)
-    raw_dataframe: pd.DataFrame       # Raw values (0.67 for 67%)
     is_xy: bool = False
     series_names: list = field(default_factory=list)
     series_formats: dict = field(default_factory=dict)  # series_name -> formatCode
 
 
-def _extract_chart_data(chart: Chart) -> tuple[pd.DataFrame, pd.DataFrame, bool, list[str], dict]:
-    """Extract data from a chart into DataFrames (display + raw)."""
+def _extract_chart_data(chart: Chart) -> tuple[pd.DataFrame, bool, list[str], dict]:
+    """Extract data from a chart into a display DataFrame."""
     chart_type = chart.chart_type
     is_xy = chart_type in XY_CHART_TYPES
 
@@ -99,15 +98,13 @@ def _extract_chart_data(chart: Chart) -> tuple[pd.DataFrame, pd.DataFrame, bool,
             y_vals = list(series.values)
             data[f"X_{series_names[i]}"] = x_vals
             data[f"Y_{series_names[i]}"] = y_vals
-        raw_df = pd.DataFrame(data)
-        display_df = raw_df.copy()
+        display_df = pd.DataFrame(data)
     else:
         try:
             categories = [str(c) for c in plot.categories]
         except Exception:
             categories = [str(i + 1) for i in range(len(list(series_list[0].values)))]
 
-        raw_data = {"קטגוריה": categories}
         display_data = {"קטגוריה": categories}
 
         for i, series in enumerate(series_list):
@@ -117,23 +114,18 @@ def _extract_chart_data(chart: Chart) -> tuple[pd.DataFrame, pd.DataFrame, bool,
             values = values[:len(categories)]
 
             name = series_names[i]
-            raw_data[name] = values
-
-            # Convert to display values based on format
             fmt = series_formats.get(name, "General")
-            if _is_percentage_format(fmt):
-                display_values = [
+            if is_percentage_format(fmt):
+                display_data[name] = [
                     round(v * 100, 2) if v is not None else None
                     for v in values
                 ]
-                display_data[name] = display_values
             else:
                 display_data[name] = values
 
-        raw_df = pd.DataFrame(raw_data)
         display_df = pd.DataFrame(display_data)
 
-    return display_df, raw_df, is_xy, series_names, series_formats
+    return display_df, is_xy, series_names, series_formats
 
 
 def _chart_type_display_name(chart_type: int) -> str:
@@ -170,14 +162,13 @@ def extract_all_charts(pptx_bytes: bytes) -> list[ChartInfo]:
 
             chart = shape.chart
             try:
-                display_df, raw_df, is_xy, series_names, series_formats = _extract_chart_data(chart)
+                display_df, is_xy, series_names, series_formats = _extract_chart_data(chart)
                 info = ChartInfo(
                     slide_index=slide_idx,
                     shape_name=shape.name,
                     chart_type=chart.chart_type,
                     chart_type_name=_chart_type_display_name(chart.chart_type),
                     dataframe=display_df,
-                    raw_dataframe=raw_df,
                     is_xy=is_xy,
                     series_names=series_names,
                     series_formats=series_formats,
