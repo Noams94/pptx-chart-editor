@@ -12,7 +12,6 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import List, Optional
 
 # Candidate soffice paths per platform
 _SOFFICE_PATHS_MACOS = [
@@ -90,38 +89,6 @@ def render_slides(pptx_bytes: bytes) -> list[bytes]:
         return _render_via_pdf(soffice, pptx_path, tmpdir)
 
 
-def render_single_slide(pptx_bytes: bytes, slide_index: int, existing_images: list[bytes]) -> list[bytes]:
-    """Re-render only one slide and return updated image list.
-
-    Extracts the target slide into a temporary single-slide PPTX,
-    renders it, and splices the result into existing_images.
-    """
-    from io import BytesIO
-    from pptx import Presentation
-
-    # Build a single-slide PPTX containing only the target slide
-    src = Presentation(BytesIO(pptx_bytes))
-    single = Presentation()
-    single.slide_width = src.slide_width
-    single.slide_height = src.slide_height
-
-    # python-pptx doesn't support copying slides natively,
-    # so we render the full deck but only update the changed slide.
-    # Still faster than the old approach because we go directly to PDF.
-    all_images = render_slides(pptx_bytes)
-
-    # Merge: keep existing images for unchanged slides, replace the target
-    result = list(existing_images)
-    # Extend if the deck grew (e.g. slides added)
-    while len(result) < len(all_images):
-        result.append(all_images[len(result)])
-    # Replace the changed slide
-    if slide_index < len(all_images):
-        result[slide_index] = all_images[slide_index]
-
-    return result
-
-
 def _render_via_pdf(soffice: str, pptx_path: str, tmpdir: str) -> list[bytes]:
     """Render slides: PPTX → PDF (LibreOffice) → PNGs."""
     pdf_outdir = os.path.join(tmpdir, "pdf_output")
@@ -154,12 +121,12 @@ def _render_via_pdf(soffice: str, pptx_path: str, tmpdir: str) -> list[bytes]:
     # Try platform-specific methods first, then cross-platform fallback
     try:
         return _pdf_to_pngs_quartz(pdf_path, png_outdir)
-    except (ImportError, Exception):
+    except Exception:
         pass
 
     try:
         return _pdf_to_pngs_pdf2image(pdf_path, png_outdir)
-    except (ImportError, Exception):
+    except Exception:
         pass
 
     raise RuntimeError("Could not render slides to images. Install poppler-utils or pdf2image.")
@@ -222,15 +189,16 @@ def _pdf_to_pngs_quartz(pdf_path: str, outdir: str) -> list[bytes]:
 
 def _pdf_to_pngs_pdf2image(pdf_path: str, outdir: str) -> list[bytes]:
     """Convert PDF to PNGs using pdf2image (cross-platform, requires Poppler)."""
+    from io import BytesIO as _BytesIO
+
     from pdf2image import convert_from_path  # type: ignore[import-untyped]
 
-    # DPI 150 is enough for preview thumbnails and much faster than 200
     pil_images = convert_from_path(pdf_path, dpi=150, fmt="png")
 
     images = []
-    for i, pil_img in enumerate(pil_images):
-        png_path = os.path.join(outdir, f"slide_{i + 1:03d}.png")
-        pil_img.save(png_path, "PNG")
-        images.append(Path(png_path).read_bytes())
+    for pil_img in pil_images:
+        buf = _BytesIO()
+        pil_img.save(buf, "PNG")
+        images.append(buf.getvalue())
 
     return images

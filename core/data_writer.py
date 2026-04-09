@@ -104,6 +104,61 @@ def update_chart_data(
     return output.getvalue()
 
 
+def update_multiple_charts(
+    pptx_bytes: bytes,
+    updates: list[tuple[int, str, pd.DataFrame, bool, dict | None]],
+) -> bytes:
+    """Update multiple charts in a single parse/save cycle.
+
+    Each update is a tuple: (slide_index, shape_name, display_df, is_xy, series_formats)
+    """
+    prs = Presentation(BytesIO(pptx_bytes))
+
+    for slide_index, shape_name, display_df, is_xy, series_formats in updates:
+        df = _display_to_raw(display_df, series_formats) if series_formats else display_df
+        slide = prs.slides[slide_index]
+
+        chart_shape = None
+        for shape in slide.shapes:
+            if shape.has_chart and shape.name == shape_name:
+                chart_shape = shape
+                break
+        if chart_shape is None:
+            continue
+
+        chart = chart_shape.chart
+
+        if is_xy:
+            chart_data = XyChartData()
+            col_names = df.columns.tolist()
+            for i in range(0, len(col_names), 2):
+                series_name = col_names[i].replace("X_", "")
+                series = chart_data.add_series(series_name)
+                x_vals = df.iloc[:, i].dropna().tolist()
+                y_vals = df.iloc[:, i + 1].dropna().tolist()
+                for x, y in zip(x_vals, y_vals):
+                    series.add_data_point(x, y)
+        else:
+            chart_data = CategoryChartData()
+            categories = df.iloc[:, 0].dropna().astype(str).tolist()
+            chart_data.categories = categories
+            for col in df.columns[1:]:
+                values = df[col].tolist()
+                values = [None if pd.isna(v) else float(v) for v in values]
+                values = values[:len(categories)]
+                while len(values) < len(categories):
+                    values.append(None)
+                chart_data.add_series(col, values)
+
+        chart.replace_data(chart_data)
+        if series_formats:
+            _restore_format_codes(chart, series_formats)
+
+    output = BytesIO()
+    prs.save(output)
+    return output.getvalue()
+
+
 def _restore_format_codes(chart, series_formats: dict):
     """Restore formatCode in chart XML after replace_data() resets them.
 

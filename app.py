@@ -12,7 +12,7 @@ import pandas as pd
 import streamlit as st
 
 from core.data_extractor import extract_all_charts, is_percentage_format
-from core.data_writer import update_chart_data
+from core.data_writer import update_chart_data, update_multiple_charts
 from core.slide_renderer import render_slides
 from ui.rtl_support import t, inject_rtl_css
 
@@ -88,6 +88,13 @@ def get_chart_df(chart_info):
     if key in st.session_state.edited_data:
         return st.session_state.edited_data[key].copy()
     return chart_info.dataframe.copy()
+
+
+def _apply_and_rerender(updated_bytes: bytes):
+    """Save updated PPTX bytes, re-render slides, and invalidate cache."""
+    st.session_state.pptx_bytes = updated_bytes
+    st.session_state.slide_images = render_slides(updated_bytes)
+    st.session_state.charts_cache = None
 
 
 # --- File Upload ---
@@ -262,9 +269,7 @@ with tab_edit:
                         selected_chart.is_xy,
                         selected_chart.series_formats,
                     )
-                    st.session_state.pptx_bytes = updated_bytes
-                    st.session_state.slide_images = render_slides(updated_bytes)
-                    st.session_state.charts_cache = None  # Invalidate cache
+                    _apply_and_rerender(updated_bytes)
                     st.success(t("changes_saved"))
                     st.rerun()
                 except Exception as e:
@@ -292,8 +297,7 @@ with tab_batch:
         if st.button(t("batch_button"), type="primary", use_container_width=True):
             with st.spinner(t("batch_spinner")):
                 try:
-                    current_bytes = st.session_state.pptx_bytes
-
+                    updates = []
                     for chart_info in charts:
                         df = get_chart_df(chart_info)
 
@@ -304,19 +308,18 @@ with tab_batch:
 
                         chart_key = (chart_info.slide_index, chart_info.shape_name)
                         st.session_state.edited_data[chart_key] = df
-
-                        current_bytes = update_chart_data(
-                            current_bytes,
+                        updates.append((
                             chart_info.slide_index,
                             chart_info.shape_name,
                             df,
                             chart_info.is_xy,
                             chart_info.series_formats,
-                        )
+                        ))
 
-                    st.session_state.pptx_bytes = current_bytes
-                    st.session_state.slide_images = render_slides(current_bytes)
-                    st.session_state.charts_cache = None
+                    updated_bytes = update_multiple_charts(
+                        st.session_state.pptx_bytes, updates,
+                    )
+                    _apply_and_rerender(updated_bytes)
                     st.success(t("batch_success", name=new_category, count=len(charts)))
                     st.rerun()
                 except Exception as e:
@@ -382,9 +385,7 @@ with tab_csv:
                                 selected_chart.is_xy,
                                 selected_chart.series_formats,
                             )
-                            st.session_state.pptx_bytes = updated_bytes
-                            st.session_state.slide_images = render_slides(updated_bytes)
-                            st.session_state.charts_cache = None
+                            _apply_and_rerender(updated_bytes)
                             st.success(t("import_success"))
                             st.rerun()
             except Exception as e:

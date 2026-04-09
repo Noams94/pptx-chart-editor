@@ -130,11 +130,6 @@ def _extract_chart_data(chart: Chart) -> tuple[pd.DataFrame, bool, list[str], di
     return display_df, is_xy, series_names, series_formats
 
 
-def _chart_type_display_name(chart_type: int) -> str:
-    """Get a localized display name for the chart type."""
-    return chart_type_display_name(chart_type)
-
-
 def extract_all_charts(pptx_bytes: bytes) -> list[ChartInfo]:
     """Extract all charts from a PPTX file."""
     prs = Presentation(BytesIO(pptx_bytes))
@@ -152,7 +147,7 @@ def extract_all_charts(pptx_bytes: bytes) -> list[ChartInfo]:
                     slide_index=slide_idx,
                     shape_name=shape.name,
                     chart_type=chart.chart_type,
-                    chart_type_name=_chart_type_display_name(chart.chart_type),
+                    chart_type_name=chart_type_display_name(chart.chart_type),
                     dataframe=display_df,
                     is_xy=is_xy,
                     series_names=series_names,

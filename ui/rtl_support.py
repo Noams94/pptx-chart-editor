@@ -199,12 +199,6 @@ def chart_type_display_name(chart_type: int) -> str:
     return t(key)
 
 
-# Keep STRINGS as a property-like accessor for backward compat if needed
-def get_strings() -> dict:
-    """Get the full string dictionary for the current language."""
-    return TRANSLATIONS[get_lang()]
-
-
 def inject_rtl_css():
     """Inject RTL CSS when language is Hebrew, or LTR reset for English."""
     if get_lang() != "he":
