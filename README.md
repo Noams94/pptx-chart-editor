@@ -20,8 +20,7 @@ Edit charts in PowerPoint presentations with a live visual preview.
 
 ### Option 1: Use Online (Recommended)
 
-<!-- Replace with your deployed URL -->
-> **[Open App](https://your-app.streamlit.app)**
+> **[Open App](https://pptx-chart-editor.streamlit.app)**
 
 No installation needed. Works on any device with a browser.
 
