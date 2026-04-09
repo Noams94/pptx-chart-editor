@@ -1,7 +1,7 @@
 """Render PPTX slides to images using LibreOffice headless.
 
 Cross-platform: macOS, Linux, Windows.
-PDF-to-PNG conversion via Quartz (macOS preferred) or pdf2image (all platforms).
+PDF-to-JPEG conversion via Quartz (macOS preferred) or pdf2image (all platforms).
 """
 
 from __future__ import annotations
@@ -71,9 +71,9 @@ def _find_soffice() -> str | None:
 
 
 def render_slides(pptx_bytes: bytes) -> list[bytes]:
-    """Render all slides in a PPTX to PNG images.
+    """Render all slides in a PPTX to JPEG images.
 
-    Goes directly to PDF→PNG path (faster than trying PNG first).
+    Goes directly to PDF→JPEG path (single LibreOffice call).
     """
     soffice = _find_soffice()
     if not soffice:
@@ -90,15 +90,17 @@ def render_slides(pptx_bytes: bytes) -> list[bytes]:
 
 
 def _render_via_pdf(soffice: str, pptx_path: str, tmpdir: str) -> list[bytes]:
-    """Render slides: PPTX → PDF (LibreOffice) → PNGs."""
+    """Render slides: PPTX → PDF (LibreOffice) → JPEGs."""
     pdf_outdir = os.path.join(tmpdir, "pdf_output")
     os.makedirs(pdf_outdir, exist_ok=True)
 
-    # Single LibreOffice call: convert to PDF
+    # Single LibreOffice call with fast flags
     result = subprocess.run(
         [
             soffice,
             "--headless",
+            "--norestore",
+            "--nofirststartwizard",
             "--convert-to", "pdf",
             "--outdir", pdf_outdir,
             pptx_path,
@@ -106,6 +108,7 @@ def _render_via_pdf(soffice: str, pptx_path: str, tmpdir: str) -> list[bytes]:
         capture_output=True,
         text=True,
         timeout=120,
+        env={**os.environ, "HOME": tmpdir},  # Avoid lock file conflicts
     )
 
     pdf_path = os.path.join(pdf_outdir, "presentation.pdf")
@@ -114,26 +117,24 @@ def _render_via_pdf(soffice: str, pptx_path: str, tmpdir: str) -> list[bytes]:
             f"LibreOffice conversion failed: {result.stderr or 'no PDF output'}"
         )
 
-    # Convert PDF pages to PNGs
-    png_outdir = os.path.join(tmpdir, "png_pages")
-    os.makedirs(png_outdir, exist_ok=True)
-
-    # Try platform-specific methods first, then cross-platform fallback
+    # Convert PDF pages to images
     try:
-        return _pdf_to_pngs_quartz(pdf_path, png_outdir)
+        return _pdf_to_jpegs_quartz(pdf_path)
     except Exception:
         pass
 
     try:
-        return _pdf_to_pngs_pdf2image(pdf_path, png_outdir)
+        return _pdf_to_jpegs_pdf2image(pdf_path)
     except Exception:
         pass
 
     raise RuntimeError("Could not render slides to images. Install poppler-utils or pdf2image.")
 
 
-def _pdf_to_pngs_quartz(pdf_path: str, outdir: str) -> list[bytes]:
-    """Convert PDF to PNGs using macOS Quartz (highest quality, macOS only)."""
+def _pdf_to_jpegs_quartz(pdf_path: str) -> list[bytes]:
+    """Convert PDF to JPEGs using macOS Quartz (macOS only)."""
+    from io import BytesIO as _BytesIO
+
     import Quartz  # type: ignore[import-untyped]
 
     url = Quartz.CFURLCreateFromFileSystemRepresentation(
@@ -151,8 +152,7 @@ def _pdf_to_pngs_quartz(pdf_path: str, outdir: str) -> list[bytes]:
         page = Quartz.CGPDFDocumentGetPage(pdf_doc, page_num)
         media_box = Quartz.CGPDFPageGetBoxRect(page, Quartz.kCGPDFMediaBox)
 
-        # Scale for good resolution
-        scale = 2.0
+        scale = 1.5  # Lower scale for faster rendering
         width = int(media_box.size.width * scale)
         height = int(media_box.size.height * scale)
 
@@ -162,43 +162,37 @@ def _pdf_to_pngs_quartz(pdf_path: str, outdir: str) -> list[bytes]:
             color_space, Quartz.kCGImageAlphaPremultipliedLast
         )
 
-        # White background
         Quartz.CGContextSetRGBFillColor(context, 1, 1, 1, 1)
         Quartz.CGContextFillRect(context, Quartz.CGRectMake(0, 0, width, height))
 
-        # Scale and draw
         Quartz.CGContextScaleCTM(context, scale, scale)
         Quartz.CGContextDrawPDFPage(context, page)
 
-        # Get image
         cg_image = Quartz.CGBitmapContextCreateImage(context)
 
-        # Save to PNG
-        png_path = os.path.join(outdir, f"slide_{page_num:03d}.png")
-        url_out = Quartz.CFURLCreateFromFileSystemRepresentation(
-            None, png_path.encode(), len(png_path.encode()), False
-        )
-        dest = Quartz.CGImageDestinationCreateWithURL(url_out, "public.png", 1, None)
-        Quartz.CGImageDestinationAddImage(dest, cg_image, None)
-        Quartz.CGImageDestinationFinalize(dest)
+        # Write to in-memory JPEG via NSBitmapImageRep
+        from AppKit import NSBitmapImageRep, NSJPEGFileType  # type: ignore[import-untyped]
 
-        images.append(Path(png_path).read_bytes())
+        ns_rep = NSBitmapImageRep.alloc().initWithCGImage_(cg_image)
+        jpeg_data = ns_rep.representationUsingType_properties_(NSJPEGFileType, {})
+        images.append(bytes(jpeg_data))
 
     return images
 
 
-def _pdf_to_pngs_pdf2image(pdf_path: str, outdir: str) -> list[bytes]:
-    """Convert PDF to PNGs using pdf2image (cross-platform, requires Poppler)."""
+def _pdf_to_jpegs_pdf2image(pdf_path: str) -> list[bytes]:
+    """Convert PDF to JPEGs using pdf2image (cross-platform, requires Poppler)."""
     from io import BytesIO as _BytesIO
 
     from pdf2image import convert_from_path  # type: ignore[import-untyped]
 
-    pil_images = convert_from_path(pdf_path, dpi=150, fmt="png")
+    # DPI 100 is enough for web preview and much faster
+    pil_images = convert_from_path(pdf_path, dpi=100, fmt="jpeg")
 
     images = []
     for pil_img in pil_images:
         buf = _BytesIO()
-        pil_img.save(buf, "PNG")
+        pil_img.save(buf, "JPEG", quality=80)
         images.append(buf.getvalue())
 
     return images

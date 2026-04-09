@@ -129,15 +129,19 @@ if not charts:
     st.warning(t("no_charts"))
     st.stop()
 
-# --- Render Slides (cached) ---
+# --- Render Slides (lazy — triggered by button or on first load) ---
 if st.session_state.slide_images is None:
-    with st.spinner(t("rendering")):
-        try:
-            st.session_state.slide_images = render_slides(st.session_state.pptx_bytes)
-            st.session_state.original_slide_images = list(st.session_state.slide_images)
-        except RuntimeError as e:
-            st.error(str(e))
-            st.stop()
+    render_col, _ = st.columns([1, 3])
+    with render_col:
+        if st.button(t("render_preview_btn"), type="primary", use_container_width=True):
+            with st.spinner(t("rendering")):
+                try:
+                    st.session_state.slide_images = render_slides(st.session_state.pptx_bytes)
+                    st.session_state.original_slide_images = list(st.session_state.slide_images)
+                    st.rerun()
+                except RuntimeError as e:
+                    st.error(str(e))
+    st.info(t("render_hint"))
 
 # --- Group charts by slide (computed once) ---
 charts_by_slide = defaultdict(list)
@@ -145,34 +149,32 @@ for c in charts:
     charts_by_slide[c.slide_index].append(c)
 
 # --- Sidebar: Slide Thumbnails ---
+slide_images = st.session_state.slide_images or []
+
 with st.sidebar:
     st.subheader(t("slides"))
 
     for slide_idx in sorted(charts_by_slide):
         chart_count = len(charts_by_slide[slide_idx])
+        is_selected = st.session_state.selected_slide == slide_idx
+        label = t("slide_n_charts", n=slide_idx + 1, count=chart_count)
 
-        if slide_idx < len(st.session_state.slide_images):
-            is_selected = st.session_state.selected_slide == slide_idx
-            label = t("slide_n_charts", n=slide_idx + 1, count=chart_count)
+        if is_selected:
+            st.markdown(f"**► {label}**")
+        else:
+            st.caption(label)
 
-            if is_selected:
-                st.markdown(f"**► {label}**")
-            else:
-                st.caption(label)
+        if st.sidebar.button(
+            t("select_slide_n", n=slide_idx + 1),
+            key=f"thumb_{slide_idx}",
+            use_container_width=True,
+        ):
+            st.session_state.selected_slide = slide_idx
+            st.rerun()
 
-            if st.sidebar.button(
-                t("select_slide_n", n=slide_idx + 1),
-                key=f"thumb_{slide_idx}",
-                use_container_width=True,
-            ):
-                st.session_state.selected_slide = slide_idx
-                st.rerun()
-
-            st.image(
-                st.session_state.slide_images[slide_idx],
-                use_container_width=True,
-            )
-            st.divider()
+        if slide_idx < len(slide_images):
+            st.image(slide_images[slide_idx], use_container_width=True)
+        st.divider()
 
 # --- Chart Selector (filtered by selected slide) ---
 if st.session_state.selected_slide is not None:
@@ -215,23 +217,21 @@ with tab_edit:
     if col_before is not None:
         with col_before:
             st.subheader(t("before"))
-            if st.session_state.original_slide_images and slide_idx < len(st.session_state.original_slide_images):
-                st.image(
-                    st.session_state.original_slide_images[slide_idx],
-                    use_container_width=True,
-                )
+            original_images = st.session_state.original_slide_images or []
+            if original_images and slide_idx < len(original_images):
+                st.image(original_images[slide_idx], use_container_width=True)
 
     # After (current)
     with col_after:
         st.subheader(t("after") if show_comparison else t("slide_preview"))
-        if slide_idx < len(st.session_state.slide_images):
+        if slide_images and slide_idx < len(slide_images):
             st.image(
-                st.session_state.slide_images[slide_idx],
+                slide_images[slide_idx],
                 use_container_width=True,
                 caption=f"{t('slide_num')} {slide_idx + 1}",
             )
         else:
-            st.warning(t("error_render"))
+            st.info(t("render_hint"))
 
     # Data Editor
     with col_editor:
