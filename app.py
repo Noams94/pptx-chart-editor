@@ -103,14 +103,14 @@ with st.sidebar:
 
 # --- Chart Selector (filtered by selected slide) ---
 if st.session_state.selected_slide is not None:
-    filtered_charts = [c for c in charts if c.slide_index == st.session_state.selected_slide]
+    filtered_indices = {i for i, c in enumerate(charts) if c.slide_index == st.session_state.selected_slide}
 else:
-    filtered_charts = charts
+    filtered_indices = set(range(len(charts)))
 
 chart_options = {
     f"{STRINGS['slide_num']} {c.slide_index + 1} - {c.shape_name} ({c.chart_type_name})": i
     for i, c in enumerate(charts)
-    if c in filtered_charts
+    if i in filtered_indices
 }
 
 if not chart_options:
