@@ -12,6 +12,8 @@ from pptx.chart.chart import Chart
 from pptx.enum.chart import XL_CHART_TYPE
 from pptx.oxml.ns import qn
 
+from ui.rtl_support import t, chart_type_display_name
+
 
 # Chart types that use XyChartData (scatter plots)
 XY_CHART_TYPES = {
@@ -82,7 +84,7 @@ def _extract_chart_data(chart: Chart) -> tuple[pd.DataFrame, bool, list[str], di
 
     plot = chart.plots[0]
     series_list = list(plot.series)
-    series_names = [s.name if s.name else f"סדרה {i+1}" for i, s in enumerate(series_list)]
+    series_names = [s.name if s.name else t("series_n", n=i+1) for i, s in enumerate(series_list)]
 
     # Extract number formats by index, then map to our column names
     format_list = _extract_series_formats_by_index(chart)
@@ -105,7 +107,7 @@ def _extract_chart_data(chart: Chart) -> tuple[pd.DataFrame, bool, list[str], di
         except Exception:
             categories = [str(i + 1) for i in range(len(list(series_list[0].values)))]
 
-        display_data = {"קטגוריה": categories}
+        display_data = {t("category"): categories}
 
         for i, series in enumerate(series_list):
             values = list(series.values)
@@ -129,25 +131,8 @@ def _extract_chart_data(chart: Chart) -> tuple[pd.DataFrame, bool, list[str], di
 
 
 def _chart_type_display_name(chart_type: int) -> str:
-    """Get a Hebrew display name for the chart type."""
-    names = {
-        XL_CHART_TYPE.COLUMN_CLUSTERED: "עמודות מקובצות",
-        XL_CHART_TYPE.COLUMN_STACKED: "עמודות מוערמות",
-        XL_CHART_TYPE.COLUMN_STACKED_100: "עמודות מוערמות 100%",
-        XL_CHART_TYPE.BAR_CLUSTERED: "מוטות מקובצות",
-        XL_CHART_TYPE.BAR_STACKED: "מוטות מוערמות",
-        XL_CHART_TYPE.BAR_STACKED_100: "מוטות מוערמות 100%",
-        XL_CHART_TYPE.LINE: "קו",
-        XL_CHART_TYPE.LINE_MARKERS: "קו עם סמנים",
-        XL_CHART_TYPE.LINE_STACKED: "קו מוערם",
-        XL_CHART_TYPE.PIE: "עוגה",
-        XL_CHART_TYPE.PIE_EXPLODED: "עוגה מפוצלת",
-        XL_CHART_TYPE.DOUGHNUT: "סופגנייה",
-        XL_CHART_TYPE.AREA: "שטח",
-        XL_CHART_TYPE.AREA_STACKED: "שטח מוערם",
-        XL_CHART_TYPE.XY_SCATTER: "פיזור",
-    }
-    return names.get(chart_type, "גרף")
+    """Get a localized display name for the chart type."""
+    return chart_type_display_name(chart_type)
 
 
 def extract_all_charts(pptx_bytes: bytes) -> list[ChartInfo]:

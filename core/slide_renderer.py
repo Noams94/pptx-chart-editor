@@ -1,28 +1,65 @@
-"""Render PPTX slides to images using LibreOffice headless."""
+"""Render PPTX slides to images using LibreOffice headless.
+
+Cross-platform: macOS, Linux, Windows.
+PDF-to-PNG conversion via Quartz (macOS preferred) or pdf2image (all platforms).
+"""
 
 from __future__ import annotations
 
 import os
+import platform
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
 from typing import List, Optional
 
-# LibreOffice paths on macOS
-SOFFICE_PATHS = [
+# Candidate soffice paths per platform
+_SOFFICE_PATHS_MACOS = [
     "/Applications/LibreOffice.app/Contents/MacOS/soffice",
-    "/usr/local/bin/soffice",
-    "/usr/bin/soffice",
     "/opt/homebrew/bin/soffice",
+    "/usr/local/bin/soffice",
 ]
+
+_SOFFICE_PATHS_LINUX = [
+    "/usr/bin/soffice",
+    "/usr/bin/libreoffice",
+    "/usr/lib/libreoffice/program/soffice",
+    "/snap/bin/libreoffice",
+]
+
+_SOFFICE_PATHS_WINDOWS = [
+    r"C:\Program Files\LibreOffice\program\soffice.exe",
+    r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
+]
+
+_INSTALL_HINTS = {
+    "Darwin": "brew install --cask libreoffice",
+    "Linux": "sudo apt install libreoffice   # or: sudo dnf install libreoffice",
+    "Windows": "Download from https://www.libreoffice.org/download/",
+}
 
 
 def _find_soffice() -> str | None:
-    """Find the LibreOffice soffice binary."""
-    for path in SOFFICE_PATHS:
+    """Find the LibreOffice soffice binary on any supported OS."""
+    system = platform.system()
+
+    if system == "Darwin":
+        candidates = _SOFFICE_PATHS_MACOS
+    elif system == "Linux":
+        candidates = _SOFFICE_PATHS_LINUX
+    elif system == "Windows":
+        candidates = _SOFFICE_PATHS_WINDOWS
+    else:
+        candidates = []
+
+    for path in candidates:
         if os.path.isfile(path):
             return path
-    return None
+
+    # Universal fallback: check PATH
+    found = shutil.which("soffice") or shutil.which("libreoffice")
+    return found
 
 
 def render_slides(pptx_bytes: bytes) -> list[bytes]:
@@ -36,9 +73,9 @@ def render_slides(pptx_bytes: bytes) -> list[bytes]:
     """
     soffice = _find_soffice()
     if not soffice:
-        raise RuntimeError(
-            "LibreOffice not found. Install with: brew install --cask libreoffice"
-        )
+        system = platform.system()
+        hint = _INSTALL_HINTS.get(system, "Install LibreOffice from https://www.libreoffice.org/download/")
+        raise RuntimeError(f"LibreOffice not found. Install with:\n  {hint}")
 
     with tempfile.TemporaryDirectory() as tmpdir:
         # Write PPTX to temp file
@@ -77,7 +114,6 @@ def render_slides(pptx_bytes: bytes) -> list[bytes]:
         # For multi-slide export, we need a different approach: export to PDF first,
         # then convert PDF pages to images.
         if len(png_files) == 1:
-            # Try PDF approach for multi-slide support
             return _render_via_pdf(soffice, pptx_bytes, tmpdir)
 
         images = []
@@ -115,91 +151,93 @@ def _render_via_pdf(soffice: str, pptx_bytes: bytes, tmpdir: str) -> list[bytes]
             return [png_files[0].read_bytes()]
         raise RuntimeError("Could not render slides")
 
-    # Convert PDF pages to PNGs using sips (macOS built-in) or LibreOffice
-    # Use sips for PDF to PNG conversion on macOS
+    # Convert PDF pages to PNGs
     png_outdir = os.path.join(tmpdir, "png_pages")
     os.makedirs(png_outdir, exist_ok=True)
 
-    # Try using Python's pdf2image if available, otherwise use sips
+    # Try platform-specific methods first, then cross-platform fallback
     try:
-        return _pdf_to_pngs_sips(pdf_path, png_outdir)
-    except Exception:
-        # Last resort: return single page render
-        png_files = sorted(Path(tmpdir).rglob("*.png"))
-        if png_files:
-            return [png_files[0].read_bytes()]
-        raise RuntimeError("Could not render slides to images")
+        return _pdf_to_pngs_quartz(pdf_path, png_outdir)
+    except (ImportError, Exception):
+        pass
 
-
-def _pdf_to_pngs_sips(pdf_path: str, outdir: str) -> list[bytes]:
-    """Convert PDF to PNGs using macOS sips (one page at a time via Preview/Quartz)."""
-    # macOS: use `sips` to convert PDF to PNG (handles only first page)
-    # For multi-page, use `mdls` to get page count then extract per-page
-    # Actually, the simplest cross-platform approach: use subprocess with
-    # `sips -s format png <pdf> --out <png>` - but sips only does first page.
-
-    # Better approach: use Quartz (PyObjC) which is available on macOS
     try:
-        import Quartz
-        from CoreFoundation import CFURLCreateFromFileSystemRepresentation
+        return _pdf_to_pngs_pdf2image(pdf_path, png_outdir)
+    except (ImportError, Exception):
+        pass
 
-        url = Quartz.CFURLCreateFromFileSystemRepresentation(
-            None, pdf_path.encode(), len(pdf_path.encode()), False
+    # Last resort: return single page render
+    png_files = sorted(Path(tmpdir).rglob("*.png"))
+    if png_files:
+        return [png_files[0].read_bytes()]
+    raise RuntimeError("Could not render slides to images. Install poppler-utils or pdf2image.")
+
+
+def _pdf_to_pngs_quartz(pdf_path: str, outdir: str) -> list[bytes]:
+    """Convert PDF to PNGs using macOS Quartz (highest quality, macOS only)."""
+    import Quartz  # type: ignore[import-untyped]
+
+    url = Quartz.CFURLCreateFromFileSystemRepresentation(
+        None, pdf_path.encode(), len(pdf_path.encode()), False
+    )
+    pdf_doc = Quartz.CGPDFDocumentCreateWithURL(url)
+
+    if pdf_doc is None:
+        raise RuntimeError("Could not open PDF")
+
+    page_count = Quartz.CGPDFDocumentGetNumberOfPages(pdf_doc)
+    images = []
+
+    for page_num in range(1, page_count + 1):
+        page = Quartz.CGPDFDocumentGetPage(pdf_doc, page_num)
+        media_box = Quartz.CGPDFPageGetBoxRect(page, Quartz.kCGPDFMediaBox)
+
+        # Scale for good resolution
+        scale = 2.0
+        width = int(media_box.size.width * scale)
+        height = int(media_box.size.height * scale)
+
+        color_space = Quartz.CGColorSpaceCreateDeviceRGB()
+        context = Quartz.CGBitmapContextCreate(
+            None, width, height, 8, width * 4,
+            color_space, Quartz.kCGImageAlphaPremultipliedLast
         )
-        pdf_doc = Quartz.CGPDFDocumentCreateWithURL(url)
 
-        if pdf_doc is None:
-            raise RuntimeError("Could not open PDF")
+        # White background
+        Quartz.CGContextSetRGBFillColor(context, 1, 1, 1, 1)
+        Quartz.CGContextFillRect(context, Quartz.CGRectMake(0, 0, width, height))
 
-        page_count = Quartz.CGPDFDocumentGetNumberOfPages(pdf_doc)
-        images = []
+        # Scale and draw
+        Quartz.CGContextScaleCTM(context, scale, scale)
+        Quartz.CGContextDrawPDFPage(context, page)
 
-        for page_num in range(1, page_count + 1):
-            page = Quartz.CGPDFDocumentGetPage(pdf_doc, page_num)
-            media_box = Quartz.CGPDFPageGetBoxRect(page, Quartz.kCGPDFMediaBox)
+        # Get image
+        cg_image = Quartz.CGBitmapContextCreateImage(context)
 
-            # Scale for good resolution
-            scale = 2.0
-            width = int(media_box.size.width * scale)
-            height = int(media_box.size.height * scale)
-
-            color_space = Quartz.CGColorSpaceCreateDeviceRGB()
-            context = Quartz.CGBitmapContextCreate(
-                None, width, height, 8, width * 4,
-                color_space, Quartz.kCGImageAlphaPremultipliedLast
-            )
-
-            # White background
-            Quartz.CGContextSetRGBFillColor(context, 1, 1, 1, 1)
-            Quartz.CGContextFillRect(context, Quartz.CGRectMake(0, 0, width, height))
-
-            # Scale and draw
-            Quartz.CGContextScaleCTM(context, scale, scale)
-            Quartz.CGContextDrawPDFPage(context, page)
-
-            # Get image
-            cg_image = Quartz.CGBitmapContextCreateImage(context)
-
-            # Save to PNG
-            png_path = os.path.join(outdir, f"slide_{page_num:03d}.png")
-            url_out = Quartz.CFURLCreateFromFileSystemRepresentation(
-                None, png_path.encode(), len(png_path.encode()), False
-            )
-            dest = Quartz.CGImageDestinationCreateWithURL(url_out, "public.png", 1, None)
-            Quartz.CGImageDestinationAddImage(dest, cg_image, None)
-            Quartz.CGImageDestinationFinalize(dest)
-
-            images.append(Path(png_path).read_bytes())
-
-        return images
-
-    except ImportError:
-        # PyObjC not available, fall back to sips (first page only)
-        out_path = os.path.join(outdir, "slide_001.png")
-        subprocess.run(
-            ["sips", "-s", "format", "png", pdf_path, "--out", out_path],
-            capture_output=True, timeout=30,
+        # Save to PNG
+        png_path = os.path.join(outdir, f"slide_{page_num:03d}.png")
+        url_out = Quartz.CFURLCreateFromFileSystemRepresentation(
+            None, png_path.encode(), len(png_path.encode()), False
         )
-        if os.path.exists(out_path):
-            return [Path(out_path).read_bytes()]
-        raise RuntimeError("Could not convert PDF to PNG")
+        dest = Quartz.CGImageDestinationCreateWithURL(url_out, "public.png", 1, None)
+        Quartz.CGImageDestinationAddImage(dest, cg_image, None)
+        Quartz.CGImageDestinationFinalize(dest)
+
+        images.append(Path(png_path).read_bytes())
+
+    return images
+
+
+def _pdf_to_pngs_pdf2image(pdf_path: str, outdir: str) -> list[bytes]:
+    """Convert PDF to PNGs using pdf2image (cross-platform, requires Poppler)."""
+    from pdf2image import convert_from_path  # type: ignore[import-untyped]
+
+    pil_images = convert_from_path(pdf_path, dpi=200, fmt="png")
+
+    images = []
+    for i, pil_img in enumerate(pil_images):
+        png_path = os.path.join(outdir, f"slide_{i + 1:03d}.png")
+        pil_img.save(png_path, "PNG")
+        images.append(Path(png_path).read_bytes())
+
+    return images

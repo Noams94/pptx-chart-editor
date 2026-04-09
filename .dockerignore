@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.git/
+.gitignore
+.DS_Store
+*.pptx
+*.png
+tmp/
+.streamlit/secrets.toml
+.claude/
