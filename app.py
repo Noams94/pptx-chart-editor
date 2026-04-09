@@ -7,7 +7,7 @@ Right panel: editable data table
 
 import streamlit as st
 
-from core.data_extractor import extract_all_charts
+from core.data_extractor import extract_all_charts, _is_percentage_format
 from core.data_writer import update_chart_data
 from core.slide_renderer import render_slides
 from ui.rtl_support import STRINGS, inject_rtl_css
@@ -88,6 +88,14 @@ with col_preview:
 with col_editor:
     st.subheader(STRINGS["data_editor"])
     st.caption(f"{STRINGS['chart_type']}: {selected_chart.chart_type_name}")
+
+    # Show format indicators for percentage columns
+    pct_cols = [
+        col for col in selected_chart.dataframe.columns[1:]
+        if _is_percentage_format(selected_chart.series_formats.get(col, ""))
+    ]
+    if pct_cols:
+        st.caption(f"עמודות באחוזים: {', '.join(pct_cols)} (הזן 67 עבור 67%)")
     st.caption(STRINGS["editing_info"])
 
     # Use a unique key per chart for the data editor
@@ -122,6 +130,7 @@ with col_editor:
                     selected_chart.shape_name,
                     edited_df,
                     selected_chart.is_xy,
+                    selected_chart.series_formats,
                 )
                 st.session_state.pptx_bytes = updated_bytes
 

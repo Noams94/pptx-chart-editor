@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from io import BytesIO
 
@@ -9,6 +10,7 @@ import pandas as pd
 from pptx import Presentation
 from pptx.chart.chart import Chart
 from pptx.enum.chart import XL_CHART_TYPE
+from pptx.oxml.ns import qn
 
 
 # Chart types that use XyChartData (scatter plots)
@@ -21,19 +23,72 @@ XY_CHART_TYPES = {
 }
 
 
+def _is_percentage_format(fmt: str) -> bool:
+    """Check if a format code represents percentages (e.g., '0%', '0.0%', '#,##0%')."""
+    if not fmt:
+        return False
+    # Remove escaped characters and quoted strings
+    cleaned = re.sub(r'"[^"]*"', '', fmt)
+    cleaned = re.sub(r'\\\.', '', cleaned)
+    return '%' in cleaned
+
+
+def _extract_series_formats(chart: Chart) -> dict[str, str]:
+    """Extract number format codes per series from chart XML.
+
+    Returns dict mapping series name -> formatCode (e.g., '0%', '#,##0', 'General')
+    """
+    formats = {}
+    chart_xml = chart.part._element
+
+    for ser in chart_xml.iter(qn('c:ser')):
+        # Get series name
+        name = None
+        tx = ser.find(qn('c:tx'))
+        if tx is not None:
+            str_ref = tx.find(qn('c:strRef'))
+            if str_ref is not None:
+                str_cache = str_ref.find(qn('c:strCache'))
+                if str_cache is not None:
+                    pt = str_cache.find(qn('c:pt'))
+                    if pt is not None:
+                        v = pt.find(qn('c:v'))
+                        if v is not None:
+                            name = v.text
+
+        # Get formatCode from val > numRef > numCache > formatCode
+        fmt_code = None
+        val = ser.find(qn('c:val'))
+        if val is not None:
+            num_ref = val.find(qn('c:numRef'))
+            if num_ref is not None:
+                num_cache = num_ref.find(qn('c:numCache'))
+                if num_cache is not None:
+                    fc = num_cache.find(qn('c:formatCode'))
+                    if fc is not None and fc.text:
+                        fmt_code = fc.text
+
+        if name and fmt_code:
+            formats[name] = fmt_code
+
+    return formats
+
+
 @dataclass
 class ChartInfo:
     slide_index: int
     shape_name: str
     chart_type: int
     chart_type_name: str
-    dataframe: pd.DataFrame
+    dataframe: pd.DataFrame          # Display values (67 for 67%)
+    raw_dataframe: pd.DataFrame       # Raw values (0.67 for 67%)
     is_xy: bool = False
     series_names: list = field(default_factory=list)
+    series_formats: dict = field(default_factory=dict)  # series_name -> formatCode
 
 
-def _extract_chart_data(chart: Chart) -> tuple[pd.DataFrame, bool, list[str]]:
-    """Extract data from a chart into a DataFrame."""
+def _extract_chart_data(chart: Chart) -> tuple[pd.DataFrame, pd.DataFrame, bool, list[str], dict]:
+    """Extract data from a chart into DataFrames (display + raw)."""
     chart_type = chart.chart_type
     is_xy = chart_type in XY_CHART_TYPES
 
@@ -41,33 +96,51 @@ def _extract_chart_data(chart: Chart) -> tuple[pd.DataFrame, bool, list[str]]:
     series_list = list(plot.series)
     series_names = [s.name if s.name else f"סדרה {i+1}" for i, s in enumerate(series_list)]
 
+    # Extract number formats
+    series_formats = _extract_series_formats(chart)
+
     if is_xy:
-        # XY charts: each series has its own x values
         data = {}
         for i, series in enumerate(series_list):
-            x_vals = list(series.values)  # In XY, x values
-            y_vals = list(series.values)  # Simplified - may need adjustment
+            x_vals = list(series.values)
+            y_vals = list(series.values)
             data[f"X_{series_names[i]}"] = x_vals
             data[f"Y_{series_names[i]}"] = y_vals
-        df = pd.DataFrame(data)
+        raw_df = pd.DataFrame(data)
+        display_df = raw_df.copy()
     else:
-        # Category charts: shared categories, series have values
         try:
             categories = [str(c) for c in plot.categories]
         except Exception:
             categories = [str(i + 1) for i in range(len(list(series_list[0].values)))]
 
-        data = {"קטגוריה": categories}
+        raw_data = {"קטגוריה": categories}
+        display_data = {"קטגוריה": categories}
+
         for i, series in enumerate(series_list):
             values = list(series.values)
-            # Pad if needed
             while len(values) < len(categories):
                 values.append(None)
-            data[series_names[i]] = values[:len(categories)]
+            values = values[:len(categories)]
 
-        df = pd.DataFrame(data)
+            name = series_names[i]
+            raw_data[name] = values
 
-    return df, is_xy, series_names
+            # Convert to display values based on format
+            fmt = series_formats.get(name, "General")
+            if _is_percentage_format(fmt):
+                display_values = [
+                    round(v * 100, 2) if v is not None else None
+                    for v in values
+                ]
+                display_data[name] = display_values
+            else:
+                display_data[name] = values
+
+        raw_df = pd.DataFrame(raw_data)
+        display_df = pd.DataFrame(display_data)
+
+    return display_df, raw_df, is_xy, series_names, series_formats
 
 
 def _chart_type_display_name(chart_type: int) -> str:
@@ -93,14 +166,7 @@ def _chart_type_display_name(chart_type: int) -> str:
 
 
 def extract_all_charts(pptx_bytes: bytes) -> list[ChartInfo]:
-    """Extract all charts from a PPTX file.
-
-    Args:
-        pptx_bytes: Raw bytes of the .pptx file
-
-    Returns:
-        List of ChartInfo objects with extracted data
-    """
+    """Extract all charts from a PPTX file."""
     prs = Presentation(BytesIO(pptx_bytes))
     charts = []
 
@@ -111,15 +177,17 @@ def extract_all_charts(pptx_bytes: bytes) -> list[ChartInfo]:
 
             chart = shape.chart
             try:
-                df, is_xy, series_names = _extract_chart_data(chart)
+                display_df, raw_df, is_xy, series_names, series_formats = _extract_chart_data(chart)
                 info = ChartInfo(
                     slide_index=slide_idx,
                     shape_name=shape.name,
                     chart_type=chart.chart_type,
                     chart_type_name=_chart_type_display_name(chart.chart_type),
-                    dataframe=df,
+                    dataframe=display_df,
+                    raw_dataframe=raw_df,
                     is_xy=is_xy,
                     series_names=series_names,
+                    series_formats=series_formats,
                 )
                 charts.append(info)
             except Exception as e:
