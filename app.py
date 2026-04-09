@@ -356,3 +356,13 @@ with tab_csv:
                             st.rerun()
             except Exception as e:
                 st.error(t("file_read_error", e=e))
+
+# --- Footer ---
+st.divider()
+st.markdown(
+    '<div style="text-align:center; color:#888; font-size:0.85rem;">'
+    'Dr. Noam Keshet &middot; <a href="https://noamkeshet.com" target="_blank">noamkeshet.com</a>'
+    ' &middot; <a href="mailto:keshet.noam@gmail.com">keshet.noam@gmail.com</a>'
+    "</div>",
+    unsafe_allow_html=True,
+)
