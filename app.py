@@ -5,11 +5,13 @@ Features: thumbnail navigation, before/after comparison, CSV import/export,
 batch row addition across all charts, Hebrew/English language switching.
 """
 
+import base64
 from collections import defaultdict
 import io
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
 from core.data_extractor import extract_all_charts, is_percentage_format
 from core.data_writer import update_chart_data, update_multiple_charts
@@ -97,6 +99,12 @@ def _apply_and_rerender(updated_bytes: bytes):
     st.session_state.charts_cache = None
 
 
+def _schedule_auto_download():
+    """Mark that an auto-download should happen on the next render."""
+    if st.session_state.get("auto_save", True):
+        st.session_state.pending_auto_download = True
+
+
 # --- File Upload ---
 uploaded_file = st.file_uploader(
     t("upload_label"),
@@ -118,6 +126,20 @@ if "pptx_bytes" not in st.session_state or st.session_state.get("file_name") != 
     st.session_state.selected_slide = None
     st.session_state.show_comparison = False
     st.session_state.charts_cache = None
+
+# --- Auto-download trigger (fires after rerun following an update) ---
+if st.session_state.pop("pending_auto_download", False):
+    b64 = base64.b64encode(st.session_state.pptx_bytes).decode()
+    components.html(
+        f"""<script>
+        const link = document.createElement('a');
+        link.href = 'data:application/vnd.openxmlformats-officedocument.presentationml.presentation;base64,{b64}';
+        link.download = 'updated_{st.session_state.file_name}';
+        link.click();
+        </script>""",
+        height=0,
+    )
+    st.toast(t("auto_saved_msg"))
 
 # --- Extract Charts (cached in session state) ---
 if st.session_state.get("charts_cache") is None:
@@ -175,6 +197,15 @@ with st.sidebar:
         if slide_idx < len(slide_images):
             st.image(slide_images[slide_idx], use_container_width=True)
         st.divider()
+
+    # Auto-save toggle
+    st.session_state.setdefault("auto_save", True)
+    auto_save = st.checkbox(
+        t("auto_save_label"),
+        value=st.session_state.auto_save,
+        help=t("auto_save_info"),
+    )
+    st.session_state.auto_save = auto_save
 
 # --- Chart Selector (filtered by selected slide) ---
 if st.session_state.selected_slide is not None:
@@ -258,6 +289,9 @@ with tab_edit:
 
         st.session_state.edited_data[chart_key] = edited_df
 
+        if not edited_df.equals(selected_chart.dataframe):
+            st.warning(t("unsaved_warning"))
+
         if st.button(t("update_preview"), type="primary", use_container_width=True):
             with st.spinner(t("rendering")):
                 try:
@@ -270,6 +304,7 @@ with tab_edit:
                         selected_chart.series_formats,
                     )
                     _apply_and_rerender(updated_bytes)
+                    _schedule_auto_download()
                     st.success(t("changes_saved"))
                     st.rerun()
                 except Exception as e:
@@ -320,6 +355,7 @@ with tab_batch:
                         st.session_state.pptx_bytes, updates,
                     )
                     _apply_and_rerender(updated_bytes)
+                    _schedule_auto_download()
                     st.success(t("batch_success", name=new_category, count=len(charts)))
                     st.rerun()
                 except Exception as e:
@@ -386,6 +422,10 @@ with tab_csv:
                                 selected_chart.series_formats,
                             )
                             _apply_and_rerender(updated_bytes)
+                            _trigger_auto_download(
+                                updated_bytes,
+                                f"updated_{st.session_state.file_name}",
+                            )
                             st.success(t("import_success"))
                             st.rerun()
             except Exception as e:

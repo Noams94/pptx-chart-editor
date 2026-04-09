@@ -62,6 +62,11 @@ TRANSLATIONS = {
         "apply_imported": "החל נתונים מיובאים",
         "import_success": "הנתונים יובאו בהצלחה",
         "file_read_error": "שגיאה בקריאת הקובץ: {e}",
+        # Auto-save
+        "auto_save_label": "שמירה אוטומטית אחרי עדכון",
+        "auto_save_info": "מוריד אוטומטית את הקובץ המעודכן אחרי כל שינוי",
+        "unsaved_warning": "יש שינויים שלא נשמרו. לחץ \"עדכן תצוגה\" כדי להחיל ולשמור.",
+        "auto_saved_msg": "הקובץ נשמר אוטומטית",
         # Data extractor
         "series_n": "סדרה {n}",
         "category": "קטגוריה",
@@ -137,6 +142,11 @@ TRANSLATIONS = {
         "apply_imported": "Apply Imported Data",
         "import_success": "Data imported successfully",
         "file_read_error": "Error reading file: {e}",
+        # Auto-save
+        "auto_save_label": "Auto-save after updates",
+        "auto_save_info": "Automatically downloads the updated file after each change",
+        "unsaved_warning": "You have unsaved edits. Click \"Update Preview\" to apply and save.",
+        "auto_saved_msg": "File auto-saved",
         # Data extractor
         "series_n": "Series {n}",
         "category": "Category",
