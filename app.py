@@ -79,6 +79,8 @@ with col_lang:
         st.session_state.charts_cache = None  # Re-extract with new language
         st.rerun()
 
+st.caption(t("instructions"))
+
 
 def get_chart_df(chart_info):
     """Get current DataFrame for a chart (edited version if exists, otherwise original)."""

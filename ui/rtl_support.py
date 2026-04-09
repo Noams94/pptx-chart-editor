@@ -11,6 +11,7 @@ TRANSLATIONS = {
     "he": {
         # Page
         "page_title": "עורך גרפים - PowerPoint",
+        "instructions": "העלה קובץ מצגת (.pptx) כדי לצפות ולערוך נתוני גרפים. בחר גרף, שנה ערכים בטבלה, והורד את המצגת המעודכנת.",
         "upload_label": "העלה קובץ מצגת (.pptx)",
         "upload_help": "גרור קובץ לכאן או לחץ לבחירה",
         "no_charts": "לא נמצאו גרפים במצגת זו",
@@ -83,6 +84,7 @@ TRANSLATIONS = {
     "en": {
         # Page
         "page_title": "Chart Editor - PowerPoint",
+        "instructions": "Upload a PowerPoint file (.pptx) to view and edit chart data. Select a chart, modify values in the table, and download the updated presentation.",
         "upload_label": "Upload a presentation file (.pptx)",
         "upload_help": "Drag a file here or click to browse",
         "no_charts": "No charts found in this presentation",
