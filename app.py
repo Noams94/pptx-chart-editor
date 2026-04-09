@@ -29,6 +29,37 @@ st.set_page_config(
 
 inject_rtl_css()
 
+# --- Footer (injected as fixed CSS so it shows regardless of st.stop) ---
+st.markdown(
+    """
+    <style>
+    .fixed-footer {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        background: white;
+        border-top: 1px solid #eee;
+        padding: 6px 0;
+        text-align: center;
+        color: #888;
+        font-size: 0.8rem;
+        z-index: 999;
+        direction: ltr;
+    }
+    .fixed-footer a { color: #888; text-decoration: none; }
+    .fixed-footer a:hover { color: #4A90D9; text-decoration: underline; }
+    .stApp > .main { padding-bottom: 40px; }
+    </style>
+    <div class="fixed-footer">
+        Dr. Noam Keshet &middot;
+        <a href="https://noamkeshet.com" target="_blank">noamkeshet.com</a> &middot;
+        <a href="mailto:keshet.noam@gmail.com">keshet.noam@gmail.com</a>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
 # --- Language toggle (top of page) ---
 col_title, col_lang = st.columns([4, 1])
 with col_title:
@@ -357,12 +388,3 @@ with tab_csv:
             except Exception as e:
                 st.error(t("file_read_error", e=e))
 
-# --- Footer ---
-st.divider()
-st.markdown(
-    '<div style="text-align:center; color:#888; font-size:0.85rem;">'
-    'Dr. Noam Keshet &middot; <a href="https://noamkeshet.com" target="_blank">noamkeshet.com</a>'
-    ' &middot; <a href="mailto:keshet.noam@gmail.com">keshet.noam@gmail.com</a>'
-    "</div>",
-    unsafe_allow_html=True,
-)
