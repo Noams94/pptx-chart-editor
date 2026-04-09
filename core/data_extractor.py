@@ -33,31 +33,21 @@ def _is_percentage_format(fmt: str) -> bool:
     return '%' in cleaned
 
 
-def _extract_series_formats(chart: Chart) -> dict[str, str]:
-    """Extract number format codes per series from chart XML.
+def _extract_series_formats_by_index(chart: Chart) -> list[str]:
+    """Extract number format codes per series from chart XML, ordered by index.
 
-    Returns dict mapping series name -> formatCode (e.g., '0%', '#,##0', 'General')
+    Returns list of formatCode strings (e.g., ['0%', 'General', '#,##0']),
+    one per series in chart order.
     """
-    formats = {}
+    formats = []
     chart_xml = chart.part._element
 
+    # Find the plot group (e.g., c:barChart, c:lineChart) which contains c:ser elements
+    # We need to iterate in document order to match series index
     for ser in chart_xml.iter(qn('c:ser')):
-        # Get series name
-        name = None
-        tx = ser.find(qn('c:tx'))
-        if tx is not None:
-            str_ref = tx.find(qn('c:strRef'))
-            if str_ref is not None:
-                str_cache = str_ref.find(qn('c:strCache'))
-                if str_cache is not None:
-                    pt = str_cache.find(qn('c:pt'))
-                    if pt is not None:
-                        v = pt.find(qn('c:v'))
-                        if v is not None:
-                            name = v.text
+        fmt_code = "General"
 
-        # Get formatCode from val > numRef > numCache > formatCode
-        fmt_code = None
+        # Try val > numRef > numCache > formatCode
         val = ser.find(qn('c:val'))
         if val is not None:
             num_ref = val.find(qn('c:numRef'))
@@ -68,8 +58,7 @@ def _extract_series_formats(chart: Chart) -> dict[str, str]:
                     if fc is not None and fc.text:
                         fmt_code = fc.text
 
-        if name and fmt_code:
-            formats[name] = fmt_code
+        formats.append(fmt_code)
 
     return formats
 
@@ -96,8 +85,12 @@ def _extract_chart_data(chart: Chart) -> tuple[pd.DataFrame, pd.DataFrame, bool,
     series_list = list(plot.series)
     series_names = [s.name if s.name else f"סדרה {i+1}" for i, s in enumerate(series_list)]
 
-    # Extract number formats
-    series_formats = _extract_series_formats(chart)
+    # Extract number formats by index, then map to our column names
+    format_list = _extract_series_formats_by_index(chart)
+    series_formats = {}
+    for i, name in enumerate(series_names):
+        if i < len(format_list):
+            series_formats[name] = format_list[i]
 
     if is_xy:
         data = {}

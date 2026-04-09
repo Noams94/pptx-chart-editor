@@ -105,28 +105,21 @@ def update_chart_data(
 
 
 def _restore_format_codes(chart, series_formats: dict):
-    """Restore formatCode in chart XML after replace_data() resets them."""
+    """Restore formatCode in chart XML after replace_data() resets them.
+
+    series_formats maps column_name -> formatCode. We match by index since
+    column order matches XML series order.
+    """
     chart_xml = chart.part._element
 
-    for ser in chart_xml.iter(qn('c:ser')):
-        # Get series name
-        name = None
-        tx = ser.find(qn('c:tx'))
-        if tx is not None:
-            str_ref = tx.find(qn('c:strRef'))
-            if str_ref is not None:
-                str_cache = str_ref.find(qn('c:strCache'))
-                if str_cache is not None:
-                    pt = str_cache.find(qn('c:pt'))
-                    if pt is not None:
-                        v = pt.find(qn('c:v'))
-                        if v is not None:
-                            name = v.text
+    # Get column names in order (these are the keys of series_formats)
+    format_values = list(series_formats.values())
 
-        if not name or name not in series_formats:
-            continue
+    for idx, ser in enumerate(chart_xml.iter(qn('c:ser'))):
+        if idx >= len(format_values):
+            break
 
-        fmt_code = series_formats[name]
+        fmt_code = format_values[idx]
 
         # Set formatCode in val > numRef > numCache > formatCode
         val = ser.find(qn('c:val'))
