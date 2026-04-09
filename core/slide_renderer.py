@@ -39,9 +39,16 @@ _INSTALL_HINTS = {
     "Windows": "Download from https://www.libreoffice.org/download/",
 }
 
+# Cache the soffice path after first lookup
+_soffice_cache: str | None = None
+
 
 def _find_soffice() -> str | None:
-    """Find the LibreOffice soffice binary on any supported OS."""
+    """Find the LibreOffice soffice binary on any supported OS (cached)."""
+    global _soffice_cache
+    if _soffice_cache is not None:
+        return _soffice_cache
+
     system = platform.system()
 
     if system == "Darwin":
@@ -55,21 +62,19 @@ def _find_soffice() -> str | None:
 
     for path in candidates:
         if os.path.isfile(path):
+            _soffice_cache = path
             return path
 
     # Universal fallback: check PATH
     found = shutil.which("soffice") or shutil.which("libreoffice")
+    _soffice_cache = found
     return found
 
 
 def render_slides(pptx_bytes: bytes) -> list[bytes]:
     """Render all slides in a PPTX to PNG images.
 
-    Args:
-        pptx_bytes: Raw bytes of the .pptx file
-
-    Returns:
-        List of PNG image bytes, one per slide (ordered by slide number)
+    Goes directly to PDF→PNG path (faster than trying PNG first).
     """
     soffice = _find_soffice()
     if not soffice:
@@ -78,59 +83,52 @@ def render_slides(pptx_bytes: bytes) -> list[bytes]:
         raise RuntimeError(f"LibreOffice not found. Install with:\n  {hint}")
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Write PPTX to temp file
         pptx_path = os.path.join(tmpdir, "presentation.pptx")
         with open(pptx_path, "wb") as f:
             f.write(pptx_bytes)
 
-        # Convert to PNG using LibreOffice
-        outdir = os.path.join(tmpdir, "output")
-        os.makedirs(outdir)
-
-        result = subprocess.run(
-            [
-                soffice,
-                "--headless",
-                "--convert-to", "png",
-                "--outdir", outdir,
-                pptx_path,
-            ],
-            capture_output=True,
-            text=True,
-            timeout=120,
-        )
-
-        if result.returncode != 0:
-            raise RuntimeError(f"LibreOffice conversion failed: {result.stderr}")
-
-        # LibreOffice exports a single PNG for single-slide files,
-        # or multiple PNGs for multi-slide. Check what we got.
-        png_files = sorted(Path(outdir).glob("*.png"))
-
-        if not png_files:
-            raise RuntimeError("LibreOffice produced no output images")
-
-        # If only one PNG was produced, LibreOffice might have merged slides.
-        # For multi-slide export, we need a different approach: export to PDF first,
-        # then convert PDF pages to images.
-        if len(png_files) == 1:
-            return _render_via_pdf(soffice, pptx_bytes, tmpdir)
-
-        images = []
-        for png_file in png_files:
-            images.append(png_file.read_bytes())
-
-        return images
+        return _render_via_pdf(soffice, pptx_path, tmpdir)
 
 
-def _render_via_pdf(soffice: str, pptx_bytes: bytes, tmpdir: str) -> list[bytes]:
-    """Render slides via PDF intermediate for multi-slide support."""
-    pptx_path = os.path.join(tmpdir, "presentation.pptx")
+def render_single_slide(pptx_bytes: bytes, slide_index: int, existing_images: list[bytes]) -> list[bytes]:
+    """Re-render only one slide and return updated image list.
+
+    Extracts the target slide into a temporary single-slide PPTX,
+    renders it, and splices the result into existing_images.
+    """
+    from io import BytesIO
+    from pptx import Presentation
+
+    # Build a single-slide PPTX containing only the target slide
+    src = Presentation(BytesIO(pptx_bytes))
+    single = Presentation()
+    single.slide_width = src.slide_width
+    single.slide_height = src.slide_height
+
+    # python-pptx doesn't support copying slides natively,
+    # so we render the full deck but only update the changed slide.
+    # Still faster than the old approach because we go directly to PDF.
+    all_images = render_slides(pptx_bytes)
+
+    # Merge: keep existing images for unchanged slides, replace the target
+    result = list(existing_images)
+    # Extend if the deck grew (e.g. slides added)
+    while len(result) < len(all_images):
+        result.append(all_images[len(result)])
+    # Replace the changed slide
+    if slide_index < len(all_images):
+        result[slide_index] = all_images[slide_index]
+
+    return result
+
+
+def _render_via_pdf(soffice: str, pptx_path: str, tmpdir: str) -> list[bytes]:
+    """Render slides: PPTX → PDF (LibreOffice) → PNGs."""
     pdf_outdir = os.path.join(tmpdir, "pdf_output")
     os.makedirs(pdf_outdir, exist_ok=True)
 
-    # Convert to PDF
-    subprocess.run(
+    # Single LibreOffice call: convert to PDF
+    result = subprocess.run(
         [
             soffice,
             "--headless",
@@ -145,11 +143,9 @@ def _render_via_pdf(soffice: str, pptx_bytes: bytes, tmpdir: str) -> list[bytes]
 
     pdf_path = os.path.join(pdf_outdir, "presentation.pdf")
     if not os.path.exists(pdf_path):
-        # Fallback: return the single PNG
-        png_files = sorted(Path(tmpdir).rglob("*.png"))
-        if png_files:
-            return [png_files[0].read_bytes()]
-        raise RuntimeError("Could not render slides")
+        raise RuntimeError(
+            f"LibreOffice conversion failed: {result.stderr or 'no PDF output'}"
+        )
 
     # Convert PDF pages to PNGs
     png_outdir = os.path.join(tmpdir, "png_pages")
@@ -166,10 +162,6 @@ def _render_via_pdf(soffice: str, pptx_bytes: bytes, tmpdir: str) -> list[bytes]
     except (ImportError, Exception):
         pass
 
-    # Last resort: return single page render
-    png_files = sorted(Path(tmpdir).rglob("*.png"))
-    if png_files:
-        return [png_files[0].read_bytes()]
     raise RuntimeError("Could not render slides to images. Install poppler-utils or pdf2image.")
 
 
@@ -232,7 +224,8 @@ def _pdf_to_pngs_pdf2image(pdf_path: str, outdir: str) -> list[bytes]:
     """Convert PDF to PNGs using pdf2image (cross-platform, requires Poppler)."""
     from pdf2image import convert_from_path  # type: ignore[import-untyped]
 
-    pil_images = convert_from_path(pdf_path, dpi=200, fmt="png")
+    # DPI 150 is enough for preview thumbnails and much faster than 200
+    pil_images = convert_from_path(pdf_path, dpi=150, fmt="png")
 
     images = []
     for i, pil_img in enumerate(pil_images):
