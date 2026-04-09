@@ -20,6 +20,12 @@ STRINGS = {
     "error_no_libreoffice": "LibreOffice לא מותקן. התקן עם: brew install --cask libreoffice",
     "changes_saved": "השינויים נשמרו בהצלחה",
     "editing_info": "ערוך את הנתונים בטבלה ולחץ 'עדכן תצוגה' לראות את השינויים",
+    "batch_add": "הוספת שורה לכל הגרפים",
+    "csv_export": "ייצוא CSV",
+    "csv_import": "ייבוא CSV",
+    "before": "לפני",
+    "after": "אחרי",
+    "comparison": "השוואה לפני/אחרי",
 }
 
 
@@ -82,6 +88,32 @@ def inject_rtl_css():
             border: 2px solid #ddd;
             border-radius: 4px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        /* Sidebar RTL */
+        [data-testid="stSidebar"] {
+            direction: rtl;
+        }
+        [data-testid="stSidebar"] h1,
+        [data-testid="stSidebar"] h2,
+        [data-testid="stSidebar"] h3,
+        [data-testid="stSidebar"] p,
+        [data-testid="stSidebar"] span {
+            direction: rtl;
+            text-align: right;
+        }
+
+        /* Tabs RTL */
+        .stTabs [data-baseweb="tab-list"] {
+            direction: rtl;
+        }
+        .stTabs [data-baseweb="tab"] {
+            direction: rtl;
+        }
+
+        /* Text input RTL */
+        .stTextInput > div {
+            direction: rtl;
         }
         </style>
         """,
