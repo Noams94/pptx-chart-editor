@@ -18,7 +18,7 @@ from ui.rtl_support import t, inject_rtl_css
 
 # --- Language Selector (must be before page config uses translated title) ---
 if "lang" not in st.session_state:
-    st.session_state.lang = "he"
+    st.session_state.lang = "en"
 
 # Page config
 st.set_page_config(
