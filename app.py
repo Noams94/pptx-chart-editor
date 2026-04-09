@@ -174,6 +174,16 @@ for c in charts:
 slide_images = st.session_state.slide_images or []
 
 with st.sidebar:
+    # Auto-save toggle
+    st.session_state.setdefault("auto_save", True)
+    auto_save = st.checkbox(
+        t("auto_save_label"),
+        value=st.session_state.auto_save,
+        help=t("auto_save_info"),
+    )
+    st.session_state.auto_save = auto_save
+    st.divider()
+
     st.subheader(t("slides"))
 
     for slide_idx in sorted(charts_by_slide):
@@ -197,15 +207,6 @@ with st.sidebar:
         if slide_idx < len(slide_images):
             st.image(slide_images[slide_idx], use_container_width=True)
         st.divider()
-
-    # Auto-save toggle
-    st.session_state.setdefault("auto_save", True)
-    auto_save = st.checkbox(
-        t("auto_save_label"),
-        value=st.session_state.auto_save,
-        help=t("auto_save_info"),
-    )
-    st.session_state.auto_save = auto_save
 
 # --- Chart Selector (filtered by selected slide) ---
 if st.session_state.selected_slide is not None:
