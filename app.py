@@ -105,6 +105,15 @@ def _schedule_auto_download():
         st.session_state.pending_auto_download = True
 
 
+def _sanitize_sheet_name(slide_index: int, shape_name: str) -> str:
+    """Create an Excel-safe sheet name: Slide{n}_{shape_name}, max 31 chars."""
+    import re
+    prefix = f"Slide{slide_index + 1}_"
+    clean_name = re.sub(r'[\[\]:*?/\\]', '', shape_name)
+    max_name_len = 31 - len(prefix)
+    return prefix + clean_name[:max_name_len]
+
+
 # --- File Upload ---
 uploaded_file = st.file_uploader(
     t("upload_label"),
@@ -230,7 +239,7 @@ selected_chart = charts[selected_idx]
 slide_idx = selected_chart.slide_index
 
 # --- Tabs: Edit / Batch Add ---
-tab_edit, tab_batch, tab_csv = st.tabs([t("tab_edit"), t("tab_batch"), t("tab_csv")])
+tab_edit, tab_batch, tab_csv, tab_excel = st.tabs([t("tab_edit"), t("tab_batch"), t("tab_csv"), t("tab_excel")])
 
 # ==================== TAB 1: EDIT ====================
 with tab_edit:
@@ -423,12 +432,108 @@ with tab_csv:
                                 selected_chart.series_formats,
                             )
                             _apply_and_rerender(updated_bytes)
-                            _trigger_auto_download(
-                                updated_bytes,
-                                f"updated_{st.session_state.file_name}",
-                            )
+                            _schedule_auto_download()
                             st.success(t("import_success"))
                             st.rerun()
+            except Exception as e:
+                st.error(t("file_read_error", e=e))
+
+
+# ==================== TAB 4: EXCEL IMPORT/EXPORT (ALL CHARTS) ====================
+with tab_excel:
+    st.subheader(t("tab_excel"))
+
+    col_export_xl, col_import_xl = st.columns(2, gap="large")
+
+    # --- Export ---
+    with col_export_xl:
+        st.markdown(f"**{t('excel_export_title')}**")
+        st.caption(t("excel_export_caption", count=len(charts)))
+
+        xl_buffer = io.BytesIO()
+        with pd.ExcelWriter(xl_buffer, engine="openpyxl") as writer:
+            seen_names = set()
+            for chart_info in charts:
+                sheet = _sanitize_sheet_name(chart_info.slide_index, chart_info.shape_name)
+                if sheet in seen_names:
+                    sheet = sheet[:29] + f"_{len(seen_names)}"
+                seen_names.add(sheet)
+                get_chart_df(chart_info).to_excel(writer, sheet_name=sheet, index=False)
+
+        base_name = st.session_state.file_name.replace(".pptx", "")
+        st.download_button(
+            label=t("excel_export_button"),
+            data=xl_buffer.getvalue(),
+            file_name=f"charts_{base_name}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
+
+    # --- Import ---
+    with col_import_xl:
+        st.markdown(f"**{t('excel_import_title')}**")
+        st.caption(t("excel_import_caption"))
+
+        xl_file = st.file_uploader(
+            t("excel_import_upload_label"),
+            type=["xlsx"],
+            key="excel_import_all",
+        )
+
+        if xl_file is not None:
+            try:
+                xls = pd.ExcelFile(xl_file, engine="openpyxl")
+
+                # Build lookup: sanitized sheet name -> chart_info
+                chart_by_sheet = {}
+                for ci in charts:
+                    chart_by_sheet[_sanitize_sheet_name(ci.slide_index, ci.shape_name)] = ci
+
+                matched = []
+                for sheet_name in xls.sheet_names:
+                    if sheet_name in chart_by_sheet:
+                        ci = chart_by_sheet[sheet_name]
+                        imported_df = pd.read_excel(xls, sheet_name=sheet_name)
+                        expected_cols = len(ci.dataframe.columns)
+                        if len(imported_df.columns) != expected_cols:
+                            st.warning(t("excel_column_mismatch_warning",
+                                         sheet=sheet_name, expected=expected_cols,
+                                         found=len(imported_df.columns)))
+                        else:
+                            imported_df.columns = ci.dataframe.columns
+                            matched.append((ci, imported_df))
+                    else:
+                        st.warning(t("excel_sheet_no_match", sheet=sheet_name))
+
+                if matched:
+                    st.info(t("excel_matched_charts", matched=len(matched), total=len(charts)))
+
+                    for ci, df in matched:
+                        with st.expander(f"Slide {ci.slide_index + 1} - {ci.shape_name}"):
+                            st.dataframe(df, use_container_width=True)
+
+                    if st.button(t("excel_apply_button"), type="primary", use_container_width=True):
+                        with st.spinner(t("excel_apply_spinner", count=len(matched))):
+                            updates = []
+                            for ci, df in matched:
+                                chart_key = (ci.slide_index, ci.shape_name)
+                                st.session_state.edited_data[chart_key] = df
+                                updates.append((
+                                    ci.slide_index,
+                                    ci.shape_name,
+                                    df,
+                                    ci.is_xy,
+                                    ci.series_formats,
+                                ))
+                            updated_bytes = update_multiple_charts(
+                                st.session_state.pptx_bytes, updates,
+                            )
+                            _apply_and_rerender(updated_bytes)
+                            _schedule_auto_download()
+                            st.success(t("excel_apply_success", count=len(matched)))
+                            st.rerun()
+                elif xls.sheet_names:
+                    st.error(t("excel_no_matches"))
             except Exception as e:
                 st.error(t("file_read_error", e=e))
 
