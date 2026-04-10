@@ -480,60 +480,70 @@ with tab_excel:
             key="excel_import_all",
         )
 
-        if xl_file is not None:
-            try:
-                xls = pd.ExcelFile(xl_file, engine="openpyxl")
+    # --- Import results (full width, below both columns) ---
+    if xl_file is not None:
+        st.divider()
+        try:
+            xls = pd.ExcelFile(xl_file, engine="openpyxl")
 
-                # Build lookup: sanitized sheet name -> chart_info
-                chart_by_sheet = {}
-                for ci in charts:
-                    chart_by_sheet[_sanitize_sheet_name(ci.slide_index, ci.shape_name)] = ci
+            # Build lookup: sanitized sheet name -> chart_info
+            chart_by_sheet = {}
+            for ci in charts:
+                chart_by_sheet[_sanitize_sheet_name(ci.slide_index, ci.shape_name)] = ci
 
-                matched = []
-                for sheet_name in xls.sheet_names:
-                    if sheet_name in chart_by_sheet:
-                        ci = chart_by_sheet[sheet_name]
-                        imported_df = pd.read_excel(xls, sheet_name=sheet_name)
-                        expected_cols = len(ci.dataframe.columns)
-                        if len(imported_df.columns) != expected_cols:
-                            st.warning(t("excel_column_mismatch_warning",
+            matched = []
+            skipped = []
+            for sheet_name in xls.sheet_names:
+                if sheet_name in chart_by_sheet:
+                    ci = chart_by_sheet[sheet_name]
+                    imported_df = pd.read_excel(xls, sheet_name=sheet_name)
+                    expected_cols = len(ci.dataframe.columns)
+                    if len(imported_df.columns) != expected_cols:
+                        skipped.append(t("excel_column_mismatch_warning",
                                          sheet=sheet_name, expected=expected_cols,
                                          found=len(imported_df.columns)))
-                        else:
-                            imported_df.columns = ci.dataframe.columns
-                            matched.append((ci, imported_df))
                     else:
-                        st.warning(t("excel_sheet_no_match", sheet=sheet_name))
+                        imported_df.columns = ci.dataframe.columns
+                        matched.append((ci, imported_df))
+                else:
+                    skipped.append(t("excel_sheet_no_match", sheet=sheet_name))
 
-                if matched:
-                    st.info(t("excel_matched_charts", matched=len(matched), total=len(charts)))
+            if matched:
+                st.info(t("excel_matched_charts", matched=len(matched), total=len(charts)))
 
-                    for ci, df in matched:
-                        with st.expander(f"Slide {ci.slide_index + 1} - {ci.shape_name}"):
-                            st.dataframe(df, use_container_width=True)
+                for ci, df in matched:
+                    with st.expander(f"Slide {ci.slide_index + 1} - {ci.shape_name}"):
+                        st.dataframe(df, use_container_width=True)
 
-                    if st.button(t("excel_apply_button"), type="primary", use_container_width=True):
-                        with st.spinner(t("excel_apply_spinner", count=len(matched))):
-                            updates = []
-                            for ci, df in matched:
-                                chart_key = (ci.slide_index, ci.shape_name)
-                                st.session_state.edited_data[chart_key] = df
-                                updates.append((
-                                    ci.slide_index,
-                                    ci.shape_name,
-                                    df,
-                                    ci.is_xy,
-                                    ci.series_formats,
-                                ))
-                            updated_bytes = update_multiple_charts(
-                                st.session_state.pptx_bytes, updates,
-                            )
-                            _apply_and_rerender(updated_bytes)
-                            _schedule_auto_download()
-                            st.success(t("excel_apply_success", count=len(matched)))
-                            st.rerun()
-                elif xls.sheet_names:
-                    st.error(t("excel_no_matches"))
-            except Exception as e:
-                st.error(t("file_read_error", e=e))
+                if skipped:
+                    with st.expander(f"⚠️ {len(skipped)} skipped", expanded=False):
+                        for msg in skipped:
+                            st.warning(msg)
+
+                if st.button(t("excel_apply_button"), type="primary", use_container_width=True):
+                    with st.spinner(t("excel_apply_spinner", count=len(matched))):
+                        updates = []
+                        for ci, df in matched:
+                            chart_key = (ci.slide_index, ci.shape_name)
+                            st.session_state.edited_data[chart_key] = df
+                            updates.append((
+                                ci.slide_index,
+                                ci.shape_name,
+                                df,
+                                ci.is_xy,
+                                ci.series_formats,
+                            ))
+                        updated_bytes = update_multiple_charts(
+                            st.session_state.pptx_bytes, updates,
+                        )
+                        _apply_and_rerender(updated_bytes)
+                        _schedule_auto_download()
+                        st.success(t("excel_apply_success", count=len(matched)))
+                        st.rerun()
+            elif xls.sheet_names:
+                st.error(t("excel_no_matches"))
+                for msg in skipped:
+                    st.warning(msg)
+        except Exception as e:
+            st.error(t("file_read_error", e=e))
 
