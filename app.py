@@ -233,213 +233,10 @@ if not chart_options:
     st.info(t("no_charts_in_slide"))
     st.stop()
 
-selected_label = st.selectbox(t("select_chart"), options=list(chart_options.keys()))
-selected_idx = chart_options[selected_label]
-selected_chart = charts[selected_idx]
-slide_idx = selected_chart.slide_index
+# ==================== GLOBAL TABS (all charts) ====================
+tab_excel, tab_batch = st.tabs([t("tab_excel"), t("tab_batch")])
 
-# --- Tabs: Edit / Batch Add ---
-tab_edit, tab_batch, tab_csv, tab_excel = st.tabs([t("tab_edit"), t("tab_batch"), t("tab_csv"), t("tab_excel")])
-
-# ==================== TAB 1: EDIT ====================
-with tab_edit:
-    col_toggle, _ = st.columns([1, 3])
-    with col_toggle:
-        show_comparison = st.checkbox(t("comparison_toggle"), value=st.session_state.show_comparison)
-        st.session_state.show_comparison = show_comparison
-
-    if show_comparison:
-        col_before, col_after, col_editor = st.columns([1, 1, 1], gap="medium")
-    else:
-        col_after, col_editor = st.columns([1, 1], gap="large")
-        col_before = None
-
-    # Before (original)
-    if col_before is not None:
-        with col_before:
-            st.subheader(t("before"))
-            original_images = st.session_state.original_slide_images or []
-            if original_images and slide_idx < len(original_images):
-                st.image(original_images[slide_idx], use_container_width=True)
-
-    # After (current)
-    with col_after:
-        st.subheader(t("after") if show_comparison else t("slide_preview"))
-        if slide_images and slide_idx < len(slide_images):
-            st.image(
-                slide_images[slide_idx],
-                use_container_width=True,
-                caption=f"{t('slide_num')} {slide_idx + 1}",
-            )
-        else:
-            st.info(t("render_hint"))
-
-    # Data Editor
-    with col_editor:
-        st.subheader(t("data_editor"))
-        st.caption(f"{t('chart_type')}: {selected_chart.chart_type_name}")
-
-        pct_cols = [
-            col for col in selected_chart.dataframe.columns[1:]
-            if is_percentage_format(selected_chart.series_formats.get(col, ""))
-        ]
-        if pct_cols:
-            st.caption(t("pct_columns_info", cols=", ".join(pct_cols)))
-        st.caption(t("editing_info"))
-
-        editor_key = f"editor_{selected_chart.slide_index}_{selected_chart.shape_name}"
-        chart_key = (selected_chart.slide_index, selected_chart.shape_name)
-
-        edited_df = st.data_editor(
-            get_chart_df(selected_chart),
-            num_rows="dynamic",
-            use_container_width=True,
-            key=editor_key,
-        )
-
-        st.session_state.edited_data[chart_key] = edited_df
-
-        if not edited_df.equals(selected_chart.dataframe):
-            st.warning(t("unsaved_warning"))
-
-        if st.button(t("update_preview"), type="primary", use_container_width=True):
-            with st.spinner(t("rendering")):
-                try:
-                    updated_bytes = update_chart_data(
-                        st.session_state.pptx_bytes,
-                        selected_chart.slide_index,
-                        selected_chart.shape_name,
-                        edited_df,
-                        selected_chart.is_xy,
-                        selected_chart.series_formats,
-                    )
-                    _apply_and_rerender(updated_bytes)
-                    _schedule_auto_download()
-                    st.success(t("changes_saved"))
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"{t('error_render')}: {e}")
-
-        st.download_button(
-            label=t("download"),
-            data=st.session_state.pptx_bytes,
-            file_name=f"updated_{st.session_state.file_name}",
-            mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-            use_container_width=True,
-        )
-
-
-# ==================== TAB 2: BATCH ADD ROW ====================
-with tab_batch:
-    st.subheader(t("tab_batch"))
-    st.caption(t("batch_caption"))
-
-    new_category = st.text_input(t("new_category_label"), key="batch_category")
-
-    if new_category:
-        st.markdown(f"**{t('batch_preview', name=new_category, count=len(charts))}**")
-
-        if st.button(t("batch_button"), type="primary", use_container_width=True):
-            with st.spinner(t("batch_spinner")):
-                try:
-                    updates = []
-                    for chart_info in charts:
-                        df = get_chart_df(chart_info)
-
-                        new_row = {df.columns[0]: new_category}
-                        for col in df.columns[1:]:
-                            new_row[col] = None
-                        df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-
-                        chart_key = (chart_info.slide_index, chart_info.shape_name)
-                        st.session_state.edited_data[chart_key] = df
-                        updates.append((
-                            chart_info.slide_index,
-                            chart_info.shape_name,
-                            df,
-                            chart_info.is_xy,
-                            chart_info.series_formats,
-                        ))
-
-                    updated_bytes = update_multiple_charts(
-                        st.session_state.pptx_bytes, updates,
-                    )
-                    _apply_and_rerender(updated_bytes)
-                    _schedule_auto_download()
-                    st.success(t("batch_success", name=new_category, count=len(charts)))
-                    st.rerun()
-                except Exception as e:
-                    st.error(t("error_generic", e=e))
-
-
-# ==================== TAB 3: CSV IMPORT/EXPORT ====================
-with tab_csv:
-    st.subheader(t("tab_csv"))
-
-    col_export, col_import = st.columns(2, gap="large")
-
-    with col_export:
-        st.markdown(f"**{t('export_title')}**")
-        st.caption(t("chart_info", name=selected_chart.shape_name, slide=selected_chart.slide_index + 1))
-
-        export_df = get_chart_df(selected_chart)
-        csv_buffer = io.StringIO()
-        export_df.to_csv(csv_buffer, index=False, encoding="utf-8")
-        csv_bytes = ("\ufeff" + csv_buffer.getvalue()).encode("utf-8")
-
-        st.download_button(
-            label=t("export_button"),
-            data=csv_bytes,
-            file_name=f"{selected_chart.shape_name}_slide{selected_chart.slide_index + 1}.csv",
-            mime="text/csv",
-            use_container_width=True,
-        )
-
-    with col_import:
-        st.markdown(f"**{t('import_title')}**")
-        st.caption(t("import_info"))
-
-        csv_file = st.file_uploader(
-            t("import_upload_label"),
-            type=["csv"],
-            key=f"csv_import_{selected_chart.slide_index}_{selected_chart.shape_name}",
-        )
-
-        if csv_file is not None:
-            try:
-                imported_df = pd.read_csv(csv_file, encoding="utf-8-sig")
-
-                expected_cols = len(selected_chart.dataframe.columns)
-                if len(imported_df.columns) != expected_cols:
-                    st.error(t("column_mismatch", expected=expected_cols, found=len(imported_df.columns)))
-                else:
-                    imported_df.columns = selected_chart.dataframe.columns
-
-                    st.markdown(f"**{t('preview_heading')}**")
-                    st.dataframe(imported_df, use_container_width=True)
-
-                    if st.button(t("apply_imported"), type="primary", use_container_width=True):
-                        chart_key = (selected_chart.slide_index, selected_chart.shape_name)
-                        st.session_state.edited_data[chart_key] = imported_df
-
-                        with st.spinner(t("rendering")):
-                            updated_bytes = update_chart_data(
-                                st.session_state.pptx_bytes,
-                                selected_chart.slide_index,
-                                selected_chart.shape_name,
-                                imported_df,
-                                selected_chart.is_xy,
-                                selected_chart.series_formats,
-                            )
-                            _apply_and_rerender(updated_bytes)
-                            _schedule_auto_download()
-                            st.success(t("import_success"))
-                            st.rerun()
-            except Exception as e:
-                st.error(t("file_read_error", e=e))
-
-
-# ==================== TAB 4: EXCEL IMPORT/EXPORT (ALL CHARTS) ====================
+# --- EXCEL IMPORT/EXPORT (ALL CHARTS) ---
 with tab_excel:
     st.subheader(t("tab_excel"))
 
@@ -555,4 +352,210 @@ with tab_excel:
                     st.warning(msg)
         except Exception as e:
             st.error(t("file_read_error", e=e))
+
+# --- BATCH ADD ROW ---
+with tab_batch:
+    st.subheader(t("tab_batch"))
+    st.caption(t("batch_caption"))
+
+    new_category = st.text_input(t("new_category_label"), key="batch_category")
+
+    if new_category:
+        st.markdown(f"**{t('batch_preview', name=new_category, count=len(charts))}**")
+
+        if st.button(t("batch_button"), type="primary", use_container_width=True):
+            with st.spinner(t("batch_spinner")):
+                try:
+                    updates = []
+                    for chart_info in charts:
+                        df = get_chart_df(chart_info)
+
+                        new_row = {df.columns[0]: new_category}
+                        for col in df.columns[1:]:
+                            new_row[col] = None
+                        df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+
+                        chart_key = (chart_info.slide_index, chart_info.shape_name)
+                        st.session_state.edited_data[chart_key] = df
+                        updates.append((
+                            chart_info.slide_index,
+                            chart_info.shape_name,
+                            df,
+                            chart_info.is_xy,
+                            chart_info.series_formats,
+                        ))
+
+                    updated_bytes = update_multiple_charts(
+                        st.session_state.pptx_bytes, updates,
+                    )
+                    _apply_and_rerender(updated_bytes)
+                    _schedule_auto_download()
+                    st.success(t("batch_success", name=new_category, count=len(charts)))
+                    st.rerun()
+                except Exception as e:
+                    st.error(t("error_generic", e=e))
+
+
+st.divider()
+
+# ==================== PER-CHART SECTION ====================
+selected_label = st.selectbox(t("select_chart"), options=list(chart_options.keys()))
+selected_idx = chart_options[selected_label]
+selected_chart = charts[selected_idx]
+slide_idx = selected_chart.slide_index
+
+tab_edit, tab_csv = st.tabs([t("tab_edit"), t("tab_csv")])
+
+# --- EDIT CHART ---
+with tab_edit:
+    col_toggle, _ = st.columns([1, 3])
+    with col_toggle:
+        show_comparison = st.checkbox(t("comparison_toggle"), value=st.session_state.show_comparison)
+        st.session_state.show_comparison = show_comparison
+
+    if show_comparison:
+        col_before, col_after, col_editor = st.columns([1, 1, 1], gap="medium")
+    else:
+        col_after, col_editor = st.columns([1, 1], gap="large")
+        col_before = None
+
+    # Before (original)
+    if col_before is not None:
+        with col_before:
+            st.subheader(t("before"))
+            original_images = st.session_state.original_slide_images or []
+            if original_images and slide_idx < len(original_images):
+                st.image(original_images[slide_idx], use_container_width=True)
+
+    # After (current)
+    with col_after:
+        st.subheader(t("after") if show_comparison else t("slide_preview"))
+        if slide_images and slide_idx < len(slide_images):
+            st.image(
+                slide_images[slide_idx],
+                use_container_width=True,
+                caption=f"{t('slide_num')} {slide_idx + 1}",
+            )
+        else:
+            st.info(t("render_hint"))
+
+    # Data Editor
+    with col_editor:
+        st.subheader(t("data_editor"))
+        st.caption(f"{t('chart_type')}: {selected_chart.chart_type_name}")
+
+        pct_cols = [
+            col for col in selected_chart.dataframe.columns[1:]
+            if is_percentage_format(selected_chart.series_formats.get(col, ""))
+        ]
+        if pct_cols:
+            st.caption(t("pct_columns_info", cols=", ".join(pct_cols)))
+        st.caption(t("editing_info"))
+
+        editor_key = f"editor_{selected_chart.slide_index}_{selected_chart.shape_name}"
+        chart_key = (selected_chart.slide_index, selected_chart.shape_name)
+
+        edited_df = st.data_editor(
+            get_chart_df(selected_chart),
+            num_rows="dynamic",
+            use_container_width=True,
+            key=editor_key,
+        )
+
+        st.session_state.edited_data[chart_key] = edited_df
+
+        if not edited_df.equals(selected_chart.dataframe):
+            st.warning(t("unsaved_warning"))
+
+        if st.button(t("update_preview"), type="primary", use_container_width=True):
+            with st.spinner(t("rendering")):
+                try:
+                    updated_bytes = update_chart_data(
+                        st.session_state.pptx_bytes,
+                        selected_chart.slide_index,
+                        selected_chart.shape_name,
+                        edited_df,
+                        selected_chart.is_xy,
+                        selected_chart.series_formats,
+                    )
+                    _apply_and_rerender(updated_bytes)
+                    _schedule_auto_download()
+                    st.success(t("changes_saved"))
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"{t('error_render')}: {e}")
+
+        st.download_button(
+            label=t("download"),
+            data=st.session_state.pptx_bytes,
+            file_name=f"updated_{st.session_state.file_name}",
+            mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            use_container_width=True,
+        )
+
+# --- CSV IMPORT/EXPORT ---
+with tab_csv:
+    st.subheader(t("tab_csv"))
+
+    col_export, col_import = st.columns(2, gap="large")
+
+    with col_export:
+        st.markdown(f"**{t('export_title')}**")
+        st.caption(t("chart_info", name=selected_chart.shape_name, slide=selected_chart.slide_index + 1))
+
+        export_df = get_chart_df(selected_chart)
+        csv_buffer = io.StringIO()
+        export_df.to_csv(csv_buffer, index=False, encoding="utf-8")
+        csv_bytes = ("\ufeff" + csv_buffer.getvalue()).encode("utf-8")
+
+        st.download_button(
+            label=t("export_button"),
+            data=csv_bytes,
+            file_name=f"{selected_chart.shape_name}_slide{selected_chart.slide_index + 1}.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+
+    with col_import:
+        st.markdown(f"**{t('import_title')}**")
+        st.caption(t("import_info"))
+
+        csv_file = st.file_uploader(
+            t("import_upload_label"),
+            type=["csv"],
+            key=f"csv_import_{selected_chart.slide_index}_{selected_chart.shape_name}",
+        )
+
+        if csv_file is not None:
+            try:
+                imported_df = pd.read_csv(csv_file, encoding="utf-8-sig")
+
+                expected_cols = len(selected_chart.dataframe.columns)
+                if len(imported_df.columns) != expected_cols:
+                    st.error(t("column_mismatch", expected=expected_cols, found=len(imported_df.columns)))
+                else:
+                    imported_df.columns = selected_chart.dataframe.columns
+
+                    st.markdown(f"**{t('preview_heading')}**")
+                    st.dataframe(imported_df, use_container_width=True)
+
+                    if st.button(t("apply_imported"), type="primary", use_container_width=True):
+                        chart_key = (selected_chart.slide_index, selected_chart.shape_name)
+                        st.session_state.edited_data[chart_key] = imported_df
+
+                        with st.spinner(t("rendering")):
+                            updated_bytes = update_chart_data(
+                                st.session_state.pptx_bytes,
+                                selected_chart.slide_index,
+                                selected_chart.shape_name,
+                                imported_df,
+                                selected_chart.is_xy,
+                                selected_chart.series_formats,
+                            )
+                            _apply_and_rerender(updated_bytes)
+                            _schedule_auto_download()
+                            st.success(t("import_success"))
+                            st.rerun()
+            except Exception as e:
+                st.error(t("file_read_error", e=e))
 
