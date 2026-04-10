@@ -8,6 +8,7 @@ batch row addition across all charts, Hebrew/English language switching.
 import base64
 from collections import defaultdict
 import io
+import re
 
 import pandas as pd
 import streamlit as st
@@ -107,11 +108,33 @@ def _schedule_auto_download():
 
 def _sanitize_sheet_name(slide_index: int, shape_name: str) -> str:
     """Create an Excel-safe sheet name: Slide{n}_{shape_name}, max 31 chars."""
-    import re
     prefix = f"Slide{slide_index + 1}_"
     clean_name = re.sub(r'[\[\]:*?/\\]', '', shape_name)
     max_name_len = 31 - len(prefix)
     return prefix + clean_name[:max_name_len]
+
+
+def _build_sheet_name_map(charts_list) -> dict:
+    """Build a deterministic mapping of chart -> unique sheet name, handling collisions."""
+    name_map = {}
+    seen = set()
+    for ci in charts_list:
+        sheet = _sanitize_sheet_name(ci.slide_index, ci.shape_name)
+        base = sheet
+        counter = 1
+        while sheet in seen:
+            sheet = base[:29] + f"_{counter}"
+            counter += 1
+        seen.add(sheet)
+        name_map[(ci.slide_index, ci.shape_name)] = sheet
+    return name_map
+
+
+def _commit_update(updated_bytes: bytes):
+    """Save updated PPTX, re-render, trigger auto-download, and rerun."""
+    _apply_and_rerender(updated_bytes)
+    _schedule_auto_download()
+    st.rerun()
 
 
 # --- File Upload ---
@@ -247,20 +270,24 @@ with tab_excel:
         st.markdown(f"**{t('excel_export_title')}**")
         st.caption(t("excel_export_caption", count=len(charts)))
 
-        xl_buffer = io.BytesIO()
-        with pd.ExcelWriter(xl_buffer, engine="openpyxl") as writer:
-            seen_names = set()
-            for chart_info in charts:
-                sheet = _sanitize_sheet_name(chart_info.slide_index, chart_info.shape_name)
-                if sheet in seen_names:
-                    sheet = sheet[:29] + f"_{len(seen_names)}"
-                seen_names.add(sheet)
-                get_chart_df(chart_info).to_excel(writer, sheet_name=sheet, index=False)
+        sheet_name_map = _build_sheet_name_map(charts)
+
+        # Cache xlsx bytes — only rebuild when chart data changes
+        edit_fingerprint = str(sorted(st.session_state.edited_data.keys()))
+        if (st.session_state.get("xl_export_fingerprint") != edit_fingerprint
+                or "xl_export_bytes" not in st.session_state):
+            xl_buffer = io.BytesIO()
+            with pd.ExcelWriter(xl_buffer, engine="openpyxl") as writer:
+                for chart_info in charts:
+                    sheet = sheet_name_map[(chart_info.slide_index, chart_info.shape_name)]
+                    get_chart_df(chart_info).to_excel(writer, sheet_name=sheet, index=False)
+            st.session_state.xl_export_bytes = xl_buffer.getvalue()
+            st.session_state.xl_export_fingerprint = edit_fingerprint
 
         base_name = st.session_state.file_name.replace(".pptx", "")
         st.download_button(
             label=t("excel_export_button"),
-            data=xl_buffer.getvalue(),
+            data=st.session_state.xl_export_bytes,
             file_name=f"charts_{base_name}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
@@ -281,34 +308,42 @@ with tab_excel:
     if xl_file is not None:
         st.divider()
         try:
-            xls = pd.ExcelFile(xl_file, engine="openpyxl")
+            # Cache import parsing — only re-parse when a new file is uploaded
+            xl_cache_key = (xl_file.name, xl_file.size)
+            if st.session_state.get("xl_import_cache_key") != xl_cache_key:
+                xls = pd.ExcelFile(xl_file, engine="openpyxl")
 
-            # Build lookup: sanitized sheet name -> chart_info
-            chart_by_sheet = {}
-            for ci in charts:
-                chart_by_sheet[_sanitize_sheet_name(ci.slide_index, ci.shape_name)] = ci
+                # Build reverse lookup: sheet name -> chart_info (using same dedup as export)
+                sheet_to_chart = {v: k for k, v in sheet_name_map.items()}
+                charts_by_key = {(ci.slide_index, ci.shape_name): ci for ci in charts}
 
-            changed = []
-            unchanged = 0
-            skipped = []
-            for sheet_name in xls.sheet_names:
-                if sheet_name in chart_by_sheet:
-                    ci = chart_by_sheet[sheet_name]
-                    imported_df = pd.read_excel(xls, sheet_name=sheet_name)
-                    expected_cols = len(ci.dataframe.columns)
-                    if len(imported_df.columns) != expected_cols:
-                        skipped.append(t("excel_column_mismatch_warning",
-                                         sheet=sheet_name, expected=expected_cols,
-                                         found=len(imported_df.columns)))
-                    else:
-                        imported_df.columns = ci.dataframe.columns
-                        current_df = get_chart_df(ci)
-                        if not imported_df.equals(current_df):
-                            changed.append((ci, imported_df))
+                changed = []
+                unchanged = 0
+                skipped = []
+                for sheet_name in xls.sheet_names:
+                    chart_key = sheet_to_chart.get(sheet_name)
+                    if chart_key and chart_key in charts_by_key:
+                        ci = charts_by_key[chart_key]
+                        imported_df = pd.read_excel(xls, sheet_name=sheet_name)
+                        expected_cols = len(ci.dataframe.columns)
+                        if len(imported_df.columns) != expected_cols:
+                            skipped.append(t("excel_column_mismatch_warning",
+                                             sheet=sheet_name, expected=expected_cols,
+                                             found=len(imported_df.columns)))
                         else:
-                            unchanged += 1
-                else:
-                    skipped.append(t("excel_sheet_no_match", sheet=sheet_name))
+                            imported_df.columns = ci.dataframe.columns
+                            current_df = get_chart_df(ci)
+                            if not imported_df.equals(current_df):
+                                changed.append((ci, imported_df))
+                            else:
+                                unchanged += 1
+                    else:
+                        skipped.append(t("excel_sheet_no_match", sheet=sheet_name))
+
+                st.session_state.xl_import_cache_key = xl_cache_key
+                st.session_state.xl_import_results = (changed, unchanged, skipped)
+
+            changed, unchanged, skipped = st.session_state.xl_import_results
 
             if changed:
                 st.success(t("excel_changes_found", changed=len(changed), total=len(changed) + unchanged))
@@ -316,11 +351,11 @@ with tab_excel:
                     st.caption(t("excel_unchanged", count=unchanged))
 
                 for ci, df in changed:
-                    st.markdown(f"**Slide {ci.slide_index + 1} — {ci.shape_name}**")
+                    st.markdown(f"**{t('slide_num')} {ci.slide_index + 1} — {ci.shape_name}**")
                     st.dataframe(df, use_container_width=True)
 
                 if skipped:
-                    with st.expander(f"⚠️ {len(skipped)} skipped", expanded=False):
+                    with st.expander(f"⚠️ {len(skipped)}", expanded=False):
                         for msg in skipped:
                             st.warning(msg)
 
@@ -340,10 +375,8 @@ with tab_excel:
                         updated_bytes = update_multiple_charts(
                             st.session_state.pptx_bytes, updates,
                         )
-                        _apply_and_rerender(updated_bytes)
-                        _schedule_auto_download()
                         st.success(t("excel_apply_success", count=len(changed)))
-                        st.rerun()
+                        _commit_update(updated_bytes)
             elif unchanged > 0:
                 st.info(t("excel_no_changes"))
             elif xls.sheet_names:
@@ -388,10 +421,8 @@ with tab_batch:
                     updated_bytes = update_multiple_charts(
                         st.session_state.pptx_bytes, updates,
                     )
-                    _apply_and_rerender(updated_bytes)
-                    _schedule_auto_download()
                     st.success(t("batch_success", name=new_category, count=len(charts)))
-                    st.rerun()
+                    _commit_update(updated_bytes)
                 except Exception as e:
                     st.error(t("error_generic", e=e))
 
@@ -478,10 +509,8 @@ with tab_edit:
                         selected_chart.is_xy,
                         selected_chart.series_formats,
                     )
-                    _apply_and_rerender(updated_bytes)
-                    _schedule_auto_download()
                     st.success(t("changes_saved"))
-                    st.rerun()
+                    _commit_update(updated_bytes)
                 except Exception as e:
                     st.error(f"{t('error_render')}: {e}")
 
@@ -552,10 +581,8 @@ with tab_csv:
                                 selected_chart.is_xy,
                                 selected_chart.series_formats,
                             )
-                            _apply_and_rerender(updated_bytes)
-                            _schedule_auto_download()
                             st.success(t("import_success"))
-                            st.rerun()
+                            _commit_update(updated_bytes)
             except Exception as e:
                 st.error(t("file_read_error", e=e))
 
