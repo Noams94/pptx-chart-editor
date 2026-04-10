@@ -519,8 +519,8 @@ with tab_excel:
                     st.caption(t("excel_unchanged", count=unchanged))
 
                 for ci, df in changed:
-                    with st.expander(f"Slide {ci.slide_index + 1} - {ci.shape_name}", expanded=True):
-                        st.dataframe(df, use_container_width=True)
+                    st.markdown(f"**Slide {ci.slide_index + 1} — {ci.shape_name}**")
+                    st.dataframe(df, use_container_width=True)
 
                 if skipped:
                     with st.expander(f"⚠️ {len(skipped)} skipped", expanded=False):
