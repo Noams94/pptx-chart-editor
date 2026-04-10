@@ -54,7 +54,7 @@ st.markdown(
     .stApp > .main { padding-bottom: 40px; }
     </style>
     <div class="fixed-footer">
-        Dr. Noam Keshet &middot;
+        &copy; All Rights Reserved &middot; Dr. Noam Keshet &middot;
         <a href="https://noamkeshet.com" target="_blank">noamkeshet.com</a> &middot;
         <a href="mailto:keshet.noam@gmail.com">keshet.noam@gmail.com</a>
     </div>
