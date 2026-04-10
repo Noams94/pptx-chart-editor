@@ -491,7 +491,8 @@ with tab_excel:
             for ci in charts:
                 chart_by_sheet[_sanitize_sheet_name(ci.slide_index, ci.shape_name)] = ci
 
-            matched = []
+            changed = []
+            unchanged = 0
             skipped = []
             for sheet_name in xls.sheet_names:
                 if sheet_name in chart_by_sheet:
@@ -504,15 +505,21 @@ with tab_excel:
                                          found=len(imported_df.columns)))
                     else:
                         imported_df.columns = ci.dataframe.columns
-                        matched.append((ci, imported_df))
+                        current_df = get_chart_df(ci)
+                        if not imported_df.equals(current_df):
+                            changed.append((ci, imported_df))
+                        else:
+                            unchanged += 1
                 else:
                     skipped.append(t("excel_sheet_no_match", sheet=sheet_name))
 
-            if matched:
-                st.info(t("excel_matched_charts", matched=len(matched), total=len(charts)))
+            if changed:
+                st.success(t("excel_changes_found", changed=len(changed), total=len(changed) + unchanged))
+                if unchanged:
+                    st.caption(t("excel_unchanged", count=unchanged))
 
-                for ci, df in matched:
-                    with st.expander(f"Slide {ci.slide_index + 1} - {ci.shape_name}"):
+                for ci, df in changed:
+                    with st.expander(f"Slide {ci.slide_index + 1} - {ci.shape_name}", expanded=True):
                         st.dataframe(df, use_container_width=True)
 
                 if skipped:
@@ -521,9 +528,9 @@ with tab_excel:
                             st.warning(msg)
 
                 if st.button(t("excel_apply_button"), type="primary", use_container_width=True):
-                    with st.spinner(t("excel_apply_spinner", count=len(matched))):
+                    with st.spinner(t("excel_apply_spinner", count=len(changed))):
                         updates = []
-                        for ci, df in matched:
+                        for ci, df in changed:
                             chart_key = (ci.slide_index, ci.shape_name)
                             st.session_state.edited_data[chart_key] = df
                             updates.append((
@@ -538,8 +545,10 @@ with tab_excel:
                         )
                         _apply_and_rerender(updated_bytes)
                         _schedule_auto_download()
-                        st.success(t("excel_apply_success", count=len(matched)))
+                        st.success(t("excel_apply_success", count=len(changed)))
                         st.rerun()
+            elif unchanged > 0:
+                st.info(t("excel_no_changes"))
             elif xls.sheet_names:
                 st.error(t("excel_no_matches"))
                 for msg in skipped:
