@@ -85,6 +85,15 @@ TRANSLATIONS = {
         "auto_save_info": "מוריד אוטומטית את הקובץ המעודכן אחרי כל שינוי",
         "unsaved_warning": "יש שינויים שלא נשמרו. לחץ \"עדכן תצוגה\" כדי להחיל ולשמור.",
         "auto_saved_msg": "הקובץ נשמר אוטומטית",
+        # Select Data tab
+        "tab_select_data": "בחירת נתונים",
+        "select_data_caption": "בחר אילו סדרות יוצגו בגרף. סדרות מוסתרות שומרות על הנתונים שלהן אבל לא מוצגות בגרף.",
+        "series_visible_label": "סדרות מוצגות",
+        "at_least_one_series": "חייבת להיות לפחות סדרה אחת מוצגת",
+        "visibility_updated": "נראות הסדרות עודכנה בהצלחה",
+        "update_visibility": "עדכן נראות",
+        "hidden_series_count": "{count} סדרות מוסתרות",
+        "all_series_visible": "כל הסדרות מוצגות",
         # Data extractor
         "series_n": "סדרה {n}",
         "category": "קטגוריה",
@@ -183,6 +192,15 @@ TRANSLATIONS = {
         "auto_save_info": "Automatically downloads the updated file after each change",
         "unsaved_warning": "You have unsaved edits. Click \"Update Preview\" to apply and save.",
         "auto_saved_msg": "File auto-saved",
+        # Select Data tab
+        "tab_select_data": "Select Data",
+        "select_data_caption": "Choose which series to display in the chart. Hidden series keep their data but are not plotted.",
+        "series_visible_label": "Visible Series",
+        "at_least_one_series": "At least one series must be visible",
+        "visibility_updated": "Series visibility updated successfully",
+        "update_visibility": "Update Visibility",
+        "hidden_series_count": "{count} series hidden",
+        "all_series_visible": "All series visible",
         # Data extractor
         "series_n": "Series {n}",
         "category": "Category",

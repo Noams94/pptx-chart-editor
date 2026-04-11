@@ -65,6 +65,23 @@ def _extract_series_formats_by_index(chart: Chart) -> list[str]:
     return formats
 
 
+def _extract_series_visibility(chart: Chart) -> dict[str, bool]:
+    """Extract visibility state per series from chart XML.
+
+    In PowerPoint, hidden series have <c:delete val="1"/> inside <c:ser>.
+    Returns dict mapping series index -> visible (True/False).
+    """
+    visibility = {}
+    chart_xml = chart.part._element
+
+    for idx, ser in enumerate(chart_xml.iter(qn('c:ser'))):
+        delete_el = ser.find(qn('c:delete'))
+        visible = delete_el is None or delete_el.get('val', '0') == '0'
+        visibility[idx] = visible
+
+    return visibility
+
+
 @dataclass
 class ChartInfo:
     slide_index: int
@@ -75,9 +92,10 @@ class ChartInfo:
     is_xy: bool = False
     series_names: list = field(default_factory=list)
     series_formats: dict = field(default_factory=dict)  # series_name -> formatCode
+    series_visibility: dict = field(default_factory=dict)  # series_name -> bool (visible)
 
 
-def _extract_chart_data(chart: Chart) -> tuple[pd.DataFrame, bool, list[str], dict]:
+def _extract_chart_data(chart: Chart) -> tuple[pd.DataFrame, bool, list[str], dict, dict]:
     """Extract data from a chart into a display DataFrame."""
     chart_type = chart.chart_type
     is_xy = chart_type in XY_CHART_TYPES
@@ -92,6 +110,12 @@ def _extract_chart_data(chart: Chart) -> tuple[pd.DataFrame, bool, list[str], di
     for i, name in enumerate(series_names):
         if i < len(format_list):
             series_formats[name] = format_list[i]
+
+    # Extract visibility state per series
+    visibility_by_idx = _extract_series_visibility(chart)
+    series_visibility = {}
+    for i, name in enumerate(series_names):
+        series_visibility[name] = visibility_by_idx.get(i, True)
 
     if is_xy:
         data = {}
@@ -127,7 +151,7 @@ def _extract_chart_data(chart: Chart) -> tuple[pd.DataFrame, bool, list[str], di
 
         display_df = pd.DataFrame(display_data)
 
-    return display_df, is_xy, series_names, series_formats
+    return display_df, is_xy, series_names, series_formats, series_visibility
 
 
 def extract_all_charts(pptx_bytes: bytes) -> list[ChartInfo]:
@@ -142,7 +166,7 @@ def extract_all_charts(pptx_bytes: bytes) -> list[ChartInfo]:
 
             chart = shape.chart
             try:
-                display_df, is_xy, series_names, series_formats = _extract_chart_data(chart)
+                display_df, is_xy, series_names, series_formats, series_visibility = _extract_chart_data(chart)
                 info = ChartInfo(
                     slide_index=slide_idx,
                     shape_name=shape.name,
@@ -152,6 +176,7 @@ def extract_all_charts(pptx_bytes: bytes) -> list[ChartInfo]:
                     is_xy=is_xy,
                     series_names=series_names,
                     series_formats=series_formats,
+                    series_visibility=series_visibility,
                 )
                 charts.append(info)
             except Exception as e:

@@ -158,6 +158,7 @@ if "pptx_bytes" not in st.session_state or st.session_state.get("file_name") != 
     st.session_state.selected_slide = None
     st.session_state.show_comparison = False
     st.session_state.charts_cache = None
+    st.session_state.series_visibility = {}
 
 # --- Auto-download trigger (fires after rerun following an update) ---
 if st.session_state.pop("pending_auto_download", False):
@@ -435,7 +436,7 @@ selected_idx = chart_options[selected_label]
 selected_chart = charts[selected_idx]
 slide_idx = selected_chart.slide_index
 
-tab_edit, tab_csv = st.tabs([t("tab_edit"), t("tab_csv")])
+tab_edit, tab_select_data, tab_csv = st.tabs([t("tab_edit"), t("tab_select_data"), t("tab_csv")])
 
 # --- EDIT CHART ---
 with tab_edit:
@@ -501,6 +502,11 @@ with tab_edit:
         if st.button(t("update_preview"), type="primary", use_container_width=True):
             with st.spinner(t("rendering")):
                 try:
+                    # Pass current visibility state if available
+                    edit_vis_key = (selected_chart.slide_index, selected_chart.shape_name)
+                    current_vis = st.session_state.get("series_visibility", {}).get(
+                        edit_vis_key, selected_chart.series_visibility
+                    )
                     updated_bytes = update_chart_data(
                         st.session_state.pptx_bytes,
                         selected_chart.slide_index,
@@ -508,6 +514,7 @@ with tab_edit:
                         edited_df,
                         selected_chart.is_xy,
                         selected_chart.series_formats,
+                        current_vis,
                     )
                     st.success(t("changes_saved"))
                     _commit_update(updated_bytes)
@@ -521,6 +528,70 @@ with tab_edit:
             mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
             use_container_width=True,
         )
+
+# --- SELECT DATA (Series Visibility) ---
+with tab_select_data:
+    st.subheader(t("tab_select_data"))
+    st.caption(t("select_data_caption"))
+
+    # Initialize visibility state from chart metadata if not already set
+    vis_key = (selected_chart.slide_index, selected_chart.shape_name)
+    if "series_visibility" not in st.session_state:
+        st.session_state.series_visibility = {}
+    if vis_key not in st.session_state.series_visibility:
+        st.session_state.series_visibility[vis_key] = dict(selected_chart.series_visibility)
+
+    current_visibility = st.session_state.series_visibility[vis_key]
+
+    # Get series names (skip category column for non-XY charts)
+    if selected_chart.is_xy:
+        series_display_names = selected_chart.series_names
+    else:
+        series_display_names = list(selected_chart.series_visibility.keys())
+
+    # Show checkboxes per series
+    st.markdown(f"**{t('series_visible_label')}**")
+    updated_visibility = {}
+    for name in series_display_names:
+        visible = current_visibility.get(name, True)
+        updated_visibility[name] = st.checkbox(
+            name,
+            value=visible,
+            key=f"vis_{selected_chart.slide_index}_{selected_chart.shape_name}_{name}",
+        )
+
+    # Validation — at least one series must be visible
+    visible_count = sum(1 for v in updated_visibility.values() if v)
+    hidden_count = len(updated_visibility) - visible_count
+
+    if hidden_count > 0:
+        st.info(t("hidden_series_count", count=hidden_count))
+    else:
+        st.success(t("all_series_visible"))
+
+    # Store updated visibility
+    st.session_state.series_visibility[vis_key] = updated_visibility
+
+    # Update button
+    if visible_count == 0:
+        st.error(t("at_least_one_series"))
+    elif st.button(t("update_visibility"), type="primary", use_container_width=True):
+        with st.spinner(t("rendering")):
+            try:
+                edited_df = get_chart_df(selected_chart)
+                updated_bytes = update_chart_data(
+                    st.session_state.pptx_bytes,
+                    selected_chart.slide_index,
+                    selected_chart.shape_name,
+                    edited_df,
+                    selected_chart.is_xy,
+                    selected_chart.series_formats,
+                    updated_visibility,
+                )
+                st.success(t("visibility_updated"))
+                _commit_update(updated_bytes)
+            except Exception as e:
+                st.error(f"{t('error_render')}: {e}")
 
 # --- CSV IMPORT/EXPORT ---
 with tab_csv:
@@ -573,6 +644,9 @@ with tab_csv:
                         st.session_state.edited_data[chart_key] = imported_df
 
                         with st.spinner(t("rendering")):
+                            csv_vis = st.session_state.get("series_visibility", {}).get(
+                                chart_key, selected_chart.series_visibility
+                            )
                             updated_bytes = update_chart_data(
                                 st.session_state.pptx_bytes,
                                 selected_chart.slide_index,
@@ -580,6 +654,7 @@ with tab_csv:
                                 imported_df,
                                 selected_chart.is_xy,
                                 selected_chart.series_formats,
+                                csv_vis,
                             )
                             st.success(t("import_success"))
                             _commit_update(updated_bytes)

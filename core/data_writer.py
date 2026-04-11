@@ -35,6 +35,7 @@ def update_chart_data(
     display_df: pd.DataFrame,
     is_xy: bool = False,
     series_formats: dict = None,
+    series_visibility: dict = None,
 ) -> bytes:
     """Update a single chart's data in the PPTX and return updated bytes.
 
@@ -99,6 +100,10 @@ def update_chart_data(
     if series_formats:
         _restore_format_codes(chart, series_formats)
 
+    # Restore series visibility state
+    if series_visibility:
+        _restore_visibility(chart, series_visibility)
+
     output = BytesIO()
     prs.save(output)
     return output.getvalue()
@@ -106,15 +111,21 @@ def update_chart_data(
 
 def update_multiple_charts(
     pptx_bytes: bytes,
-    updates: list[tuple[int, str, pd.DataFrame, bool, dict | None]],
+    updates: list[tuple[int, str, pd.DataFrame, bool, dict | None, dict | None]],
 ) -> bytes:
     """Update multiple charts in a single parse/save cycle.
 
-    Each update is a tuple: (slide_index, shape_name, display_df, is_xy, series_formats)
+    Each update is a tuple: (slide_index, shape_name, display_df, is_xy, series_formats, series_visibility)
     """
     prs = Presentation(BytesIO(pptx_bytes))
 
-    for slide_index, shape_name, display_df, is_xy, series_formats in updates:
+    for update in updates:
+        # Support both old 5-tuple and new 6-tuple format
+        if len(update) == 6:
+            slide_index, shape_name, display_df, is_xy, series_formats, series_visibility = update
+        else:
+            slide_index, shape_name, display_df, is_xy, series_formats = update
+            series_visibility = None
         df = _display_to_raw(display_df, series_formats) if series_formats else display_df
         slide = prs.slides[slide_index]
 
@@ -153,6 +164,8 @@ def update_multiple_charts(
         chart.replace_data(chart_data)
         if series_formats:
             _restore_format_codes(chart, series_formats)
+        if series_visibility:
+            _restore_visibility(chart, series_visibility)
 
     output = BytesIO()
     prs.save(output)
@@ -187,3 +200,31 @@ def _restore_format_codes(chart, series_formats: dict):
                     if fc is None:
                         fc = etree.SubElement(num_cache, qn('c:formatCode'))
                     fc.text = fmt_code
+
+
+def _restore_visibility(chart, series_visibility: dict):
+    """Restore series visibility (show/hide) in chart XML.
+
+    In PowerPoint, hidden series have <c:delete val="1"/> inside <c:ser>.
+    series_visibility maps series_name -> bool (True = visible).
+    We match by index since column order matches XML series order.
+    """
+    chart_xml = chart.part._element
+    visibility_values = list(series_visibility.values())
+
+    for idx, ser in enumerate(chart_xml.iter(qn('c:ser'))):
+        if idx >= len(visibility_values):
+            break
+
+        visible = visibility_values[idx]
+        delete_el = ser.find(qn('c:delete'))
+
+        if not visible:
+            # Series should be hidden — add or update c:delete val="1"
+            if delete_el is None:
+                delete_el = etree.SubElement(ser, qn('c:delete'))
+            delete_el.set('val', '1')
+        else:
+            # Series should be visible — remove c:delete if present
+            if delete_el is not None:
+                ser.remove(delete_el)
