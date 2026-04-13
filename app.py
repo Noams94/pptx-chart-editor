@@ -17,6 +17,7 @@ import streamlit.components.v1 as components
 from core.data_extractor import extract_all_charts, is_percentage_format
 from core.data_writer import update_chart_data, update_multiple_charts
 from core.slide_renderer import render_slides
+from ui.chart_preview import render_chart_plotly
 from ui.rtl_support import t, inject_rtl_css
 
 # --- Language Selector (must be before page config uses translated title) ---
@@ -52,7 +53,7 @@ st.markdown(
     }
     .fixed-footer a { color: #888; text-decoration: none; }
     .fixed-footer a:hover { color: #4A90D9; text-decoration: underline; }
-    .stApp > .main { padding-bottom: 40px; }
+    .stApp > .main { padding-bottom: 60px; }
     </style>
     <div class="fixed-footer">
         &copy; All Rights Reserved &middot; Dr. Noam Keshet &middot;
@@ -68,8 +69,8 @@ col_title, col_lang = st.columns([4, 1])
 with col_title:
     st.title(t("page_title"))
 with col_lang:
-    lang_options = {"עברית": "he", "English": "en"}
-    current_label = "עברית" if st.session_state.lang == "he" else "English"
+    lang_options = {"HE 🇮🇱": "he", "EN 🇺🇸": "en"}
+    current_label = "HE 🇮🇱" if st.session_state.lang == "he" else "EN 🇺🇸"
     selected_lang_label = st.selectbox(
         "🌐",
         options=list(lang_options.keys()),
@@ -156,9 +157,12 @@ if "pptx_bytes" not in st.session_state or st.session_state.get("file_name") != 
     st.session_state.original_slide_images = None
     st.session_state.edited_data = {}
     st.session_state.selected_slide = None
-    st.session_state.show_comparison = False
+    st.session_state.show_chart_comparison = False
+    st.session_state.show_slide_comparison = False
+    st.session_state.original_charts = None
     st.session_state.charts_cache = None
     st.session_state.series_visibility = {}
+    st.session_state.undo_stack = []
 
 # --- Auto-download trigger (fires after rerun following an update) ---
 if st.session_state.pop("pending_auto_download", False):
@@ -177,12 +181,22 @@ if st.session_state.pop("pending_auto_download", False):
 # --- Extract Charts (cached in session state) ---
 if st.session_state.get("charts_cache") is None:
     st.session_state.charts_cache = extract_all_charts(st.session_state.pptx_bytes)
+    # Store original chart data for before/after Plotly comparison
+    if st.session_state.original_charts is None:
+        st.session_state.original_charts = {
+            (c.slide_index, c.shape_name): c.dataframe.copy()
+            for c in st.session_state.charts_cache
+        }
 
 charts = st.session_state.charts_cache
 
 if not charts:
     st.warning(t("no_charts"))
     st.stop()
+
+# --- Onboarding summary ---
+num_slides = len({c.slide_index for c in charts})
+st.info(t("onboarding_summary", slides=num_slides, charts=len(charts)))
 
 # --- Render Slides (lazy — triggered by button or on first load) ---
 if st.session_state.slide_images is None:
@@ -219,7 +233,15 @@ with st.sidebar:
 
     st.subheader(t("slides"))
 
+    slide_filter = st.text_input(t("filter_slides"), key="slide_filter", label_visibility="collapsed", placeholder=t("filter_slides"))
+
     for slide_idx in sorted(charts_by_slide):
+        # Filter by slide number or chart name
+        if slide_filter:
+            slide_num_str = str(slide_idx + 1)
+            chart_names = " ".join(c.chart_title or c.shape_name for c in charts_by_slide[slide_idx]).lower()
+            if slide_filter.lower() not in slide_num_str and slide_filter.lower() not in chart_names:
+                continue
         chart_count = len(charts_by_slide[slide_idx])
         is_selected = st.session_state.selected_slide == slide_idx
         label = t("slide_n_charts", n=slide_idx + 1, count=chart_count)
@@ -248,7 +270,7 @@ else:
     filtered_indices = set(range(len(charts)))
 
 chart_options = {
-    f"{t('slide_num')} {c.slide_index + 1} - {c.shape_name} ({c.chart_type_name})": i
+    f"{t('slide_num')} {c.slide_index + 1} - {c.chart_title or c.shape_name} ({c.chart_type_name})": i
     for i, c in enumerate(charts)
     if i in filtered_indices
 }
@@ -440,73 +462,69 @@ tab_edit, tab_select_data, tab_csv = st.tabs([t("tab_edit"), t("tab_select_data"
 
 # --- EDIT CHART ---
 with tab_edit:
-    col_toggle, _ = st.columns([1, 3])
-    with col_toggle:
-        show_comparison = st.checkbox(t("comparison_toggle"), value=st.session_state.show_comparison)
-        st.session_state.show_comparison = show_comparison
+    chart_key = (selected_chart.slide_index, selected_chart.shape_name)
+    current_df = get_chart_df(selected_chart)
+    current_vis = st.session_state.get("series_visibility", {}).get(
+        chart_key, selected_chart.series_visibility
+    )
 
-    if show_comparison:
-        col_before, col_after, col_editor = st.columns([1, 1, 1], gap="medium")
-    else:
-        col_after, col_editor = st.columns([1, 1], gap="large")
-        col_before = None
+    # --- Data Editor (full width, first) ---
+    st.subheader(t("data_editor"))
+    st.caption(f"{t('chart_type')}: {selected_chart.chart_type_name}")
 
-    # Before (original)
-    if col_before is not None:
-        with col_before:
-            st.subheader(t("before"))
-            original_images = st.session_state.original_slide_images or []
-            if original_images and slide_idx < len(original_images):
-                st.image(original_images[slide_idx], use_container_width=True)
+    pct_cols = [
+        col for col in selected_chart.dataframe.columns[1:]
+        if is_percentage_format(selected_chart.series_formats.get(col, ""))
+    ]
+    if pct_cols:
+        st.caption(t("pct_columns_info", cols=", ".join(pct_cols)))
+    st.caption(t("editing_info"))
 
-    # After (current)
-    with col_after:
-        st.subheader(t("after") if show_comparison else t("slide_preview"))
-        if slide_images and slide_idx < len(slide_images):
-            st.image(
-                slide_images[slide_idx],
-                use_container_width=True,
-                caption=f"{t('slide_num')} {slide_idx + 1}",
-            )
+    editor_key = f"editor_{selected_chart.slide_index}_{selected_chart.shape_name}"
+
+    # Build column config with widths based on content
+    _edit_df = get_chart_df(selected_chart)
+    _col_config = {}
+    for col in _edit_df.columns:
+        max_len = max(len(str(col)), _edit_df[col].astype(str).str.len().max() if len(_edit_df) > 0 else 0)
+        if max_len <= 6:
+            _col_config[col] = st.column_config.Column(width="small")
+        elif max_len <= 15:
+            _col_config[col] = st.column_config.Column(width="medium")
         else:
-            st.info(t("render_hint"))
+            _col_config[col] = st.column_config.Column(width="large")
 
-    # Data Editor
-    with col_editor:
-        st.subheader(t("data_editor"))
-        st.caption(f"{t('chart_type')}: {selected_chart.chart_type_name}")
+    edited_df = st.data_editor(
+        _edit_df,
+        num_rows="dynamic",
+        use_container_width=True,
+        column_config=_col_config,
+        key=editor_key,
+    )
 
-        pct_cols = [
-            col for col in selected_chart.dataframe.columns[1:]
-            if is_percentage_format(selected_chart.series_formats.get(col, ""))
-        ]
-        if pct_cols:
-            st.caption(t("pct_columns_info", cols=", ".join(pct_cols)))
-        st.caption(t("editing_info"))
+    # Push to undo stack if data changed
+    prev_df = st.session_state.edited_data.get(chart_key)
+    if prev_df is not None and not edited_df.equals(prev_df):
+        st.session_state.setdefault("undo_stack", []).append((chart_key, prev_df.copy()))
+    st.session_state.edited_data[chart_key] = edited_df
 
-        editor_key = f"editor_{selected_chart.slide_index}_{selected_chart.shape_name}"
-        chart_key = (selected_chart.slide_index, selected_chart.shape_name)
+    has_unsaved = not edited_df.equals(selected_chart.dataframe)
+    if has_unsaved:
+        st.warning(t("unsaved_warning"))
 
-        edited_df = st.data_editor(
-            get_chart_df(selected_chart),
-            num_rows="dynamic",
-            use_container_width=True,
-            key=editor_key,
-        )
-
-        st.session_state.edited_data[chart_key] = edited_df
-
-        if not edited_df.equals(selected_chart.dataframe):
-            st.warning(t("unsaved_warning"))
-
-        if st.button(t("update_preview"), type="primary", use_container_width=True):
-            with st.spinner(t("rendering")):
+    col_undo, col_save, col_render, col_download = st.columns([1, 1, 1, 1], gap="medium")
+    with col_undo:
+        undo_stack = st.session_state.get("undo_stack", [])
+        if st.button(t("undo"), use_container_width=True, disabled=len(undo_stack) == 0):
+            if undo_stack:
+                undo_key, undo_df = undo_stack.pop()
+                st.session_state.edited_data[undo_key] = undo_df
+                st.success(t("undo_success"))
+                st.rerun()
+    with col_save:
+        if st.button(t("save_to_pptx"), type="primary", use_container_width=True, disabled=not has_unsaved, help=None if has_unsaved else t("save_disabled_hint")):
+            with st.spinner(t("saving_to_pptx")):
                 try:
-                    # Pass current visibility state if available
-                    edit_vis_key = (selected_chart.slide_index, selected_chart.shape_name)
-                    current_vis = st.session_state.get("series_visibility", {}).get(
-                        edit_vis_key, selected_chart.series_visibility
-                    )
                     updated_bytes = update_chart_data(
                         st.session_state.pptx_bytes,
                         selected_chart.slide_index,
@@ -516,11 +534,23 @@ with tab_edit:
                         selected_chart.series_formats,
                         current_vis,
                     )
-                    st.success(t("changes_saved"))
-                    _commit_update(updated_bytes)
+                    st.session_state.pptx_bytes = updated_bytes
+                    st.session_state.charts_cache = None
+                    st.session_state.edited_data.pop(chart_key, None)
+                    _schedule_auto_download()
+                    st.success(t("saved_to_pptx"))
+                    st.rerun()
                 except Exception as e:
                     st.error(f"{t('error_render')}: {e}")
-
+    with col_render:
+        if st.button(t("update_preview"), use_container_width=True):
+            with st.spinner(t("rendering")):
+                try:
+                    st.session_state.slide_images = render_slides(st.session_state.pptx_bytes)
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"{t('error_render')}: {e}")
+    with col_download:
         st.download_button(
             label=t("download"),
             data=st.session_state.pptx_bytes,
@@ -528,6 +558,80 @@ with tab_edit:
             mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
             use_container_width=True,
         )
+
+    st.divider()
+
+    # --- Plotly Chart Preview (Before / After) ---
+    col_chart_title, col_chart_toggle = st.columns([3, 1])
+    with col_chart_title:
+        st.markdown(f"**{t('chart_preview')}**")
+    with col_chart_toggle:
+        show_chart_comparison = st.checkbox(
+            t("chart_comparison_toggle"), value=st.session_state.show_chart_comparison,
+            key="chart_comp_toggle",
+        )
+        st.session_state.show_chart_comparison = show_chart_comparison
+    if show_chart_comparison:
+        chart_col_before, chart_col_after = st.columns(2, gap="medium")
+        with chart_col_before:
+            st.subheader(t("before"))
+            original_df = st.session_state.original_charts.get(chart_key)
+            if original_df is not None:
+                fig_before = render_chart_plotly(
+                    original_df, selected_chart.chart_type,
+                    selected_chart.series_visibility, selected_chart.series_formats,
+                )
+                st.plotly_chart(fig_before, use_container_width=True, key=f"plotly_before_{chart_key}")
+        with chart_col_after:
+            st.subheader(t("after"))
+            fig_after = render_chart_plotly(
+                current_df, selected_chart.chart_type,
+                current_vis, selected_chart.series_formats,
+            )
+            st.plotly_chart(fig_after, use_container_width=True, key=f"plotly_after_{chart_key}")
+    else:
+        fig_current = render_chart_plotly(
+            current_df, selected_chart.chart_type,
+            current_vis, selected_chart.series_formats,
+        )
+        st.plotly_chart(fig_current, use_container_width=True, key=f"plotly_current_{chart_key}")
+
+    # --- Full Slide Preview (Before / After) ---
+    col_slide_title, col_slide_toggle = st.columns([3, 1])
+    with col_slide_title:
+        st.markdown(f"**{t('full_slide_preview')}**")
+    with col_slide_toggle:
+        show_slide_comparison = st.checkbox(
+            t("slide_comparison_toggle"), value=st.session_state.show_slide_comparison,
+            key="slide_comp_toggle",
+        )
+        st.session_state.show_slide_comparison = show_slide_comparison
+    if show_slide_comparison:
+        slide_col_before, slide_col_after = st.columns(2, gap="medium")
+        with slide_col_before:
+            st.subheader(t("before"))
+            original_images = st.session_state.original_slide_images or []
+            if original_images and slide_idx < len(original_images):
+                st.image(original_images[slide_idx], use_container_width=True)
+        with slide_col_after:
+            st.subheader(t("after"))
+            if slide_images and slide_idx < len(slide_images):
+                st.image(
+                    slide_images[slide_idx],
+                    use_container_width=True,
+                    caption=f"{t('slide_num')} {slide_idx + 1}",
+                )
+            else:
+                st.info(t("render_hint"))
+    else:
+        if slide_images and slide_idx < len(slide_images):
+            st.image(
+                slide_images[slide_idx],
+                use_container_width=True,
+                caption=f"{t('slide_num')} {slide_idx + 1}",
+            )
+        else:
+            st.info(t("render_hint"))
 
 # --- SELECT DATA (Series Visibility) ---
 with tab_select_data:

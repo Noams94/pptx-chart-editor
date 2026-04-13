@@ -93,6 +93,7 @@ class ChartInfo:
     series_names: list = field(default_factory=list)
     series_formats: dict = field(default_factory=dict)  # series_name -> formatCode
     series_visibility: dict = field(default_factory=dict)  # series_name -> bool (visible)
+    chart_title: str = ""            # Chart title from XML (if available)
 
 
 def _extract_chart_data(chart: Chart) -> tuple[pd.DataFrame, bool, list[str], dict, dict]:
@@ -167,6 +168,10 @@ def extract_all_charts(pptx_bytes: bytes) -> list[ChartInfo]:
             chart = shape.chart
             try:
                 display_df, is_xy, series_names, series_formats, series_visibility = _extract_chart_data(chart)
+                # Extract chart title if available
+                title_text = ""
+                if chart.has_title and chart.chart_title and chart.chart_title.has_text_frame:
+                    title_text = chart.chart_title.text_frame.text.strip()
                 info = ChartInfo(
                     slide_index=slide_idx,
                     shape_name=shape.name,
@@ -177,6 +182,7 @@ def extract_all_charts(pptx_bytes: bytes) -> list[ChartInfo]:
                     series_names=series_names,
                     series_formats=series_formats,
                     series_visibility=series_visibility,
+                    chart_title=title_text,
                 )
                 charts.append(info)
             except Exception as e:
