@@ -27,7 +27,7 @@ TRANSLATIONS = {
         "slide_num": "שקף",
         "error_render": "שגיאה ברינדור השקף",
         "changes_saved": "השינויים נשמרו בהצלחה",
-        "editing_info": "ערוך את הנתונים בטבלה ולחץ 'עדכן תצוגה' לראות את השינויים",
+        "editing_info": "ערוך את הנתונים בטבלה. התצוגה מתעדכנת מיידית. לחץ 'שמור במצגת' כדי להחיל על הקובץ.",
         # Sidebar
         "slides": "שקפים",
         "slide_n_charts": "שקף {n} ({count} גרפים)",
@@ -39,8 +39,15 @@ TRANSLATIONS = {
         "tab_csv": "ייבוא/ייצוא CSV",
         # Edit tab
         "comparison_toggle": "השוואה לפני/אחרי",
+        "chart_comparison_toggle": "לפני/אחרי",
+        "slide_comparison_toggle": "לפני/אחרי",
         "before": "לפני",
         "after": "אחרי",
+        "chart_preview": "תצוגת גרף",
+        "full_slide_preview": "תצוגת שקף מלאה",
+        "save_to_pptx": "שמור במצגת",
+        "saving_to_pptx": "שומר במצגת ומרנדר...",
+        "saved_to_pptx": "השינויים נשמרו במצגת בהצלחה",
         "pct_columns_info": "עמודות באחוזים: {cols} (הזן 67 עבור 67%)",
         # Batch tab
         "batch_caption": "הוסף קטגוריה חדשה (למשל תאריך סקר) לכל הגרפים במצגת בבת אחת",
@@ -82,8 +89,17 @@ TRANSLATIONS = {
         "excel_sheet_no_match": "לשונית '{sheet}' - לא נמצא גרף תואם",
         # Auto-save
         "auto_save_label": "שמירה אוטומטית אחרי עדכון",
-        "auto_save_info": "מוריד אוטומטית את הקובץ המעודכן אחרי כל שינוי",
-        "unsaved_warning": "יש שינויים שלא נשמרו. לחץ \"עדכן תצוגה\" כדי להחיל ולשמור.",
+        "auto_save_info": "מוריד אוטומטית את הקובץ המעודכן אחרי לחיצה על 'שמור במצגת'",
+        "unsaved_warning": "יש שינויים שלא נשמרו. לחץ 'שמור במצגת' כדי להחיל.",
+        "save_disabled_hint": "ערוך נתונים בטבלה כדי להפעיל שמירה",
+        # Sidebar filter
+        "filter_slides": "סנן שקפים...",
+        # Onboarding
+        "onboarding_summary": "נמצאו {slides} שקפים עם {charts} גרפים. בחר שקף מהסרגל הצדי כדי להתחיל.",
+        # Undo
+        "undo": "ביטול",
+        "undo_success": "השינוי האחרון בוטל",
+        "no_undo": "אין שינויים לביטול",
         "auto_saved_msg": "הקובץ נשמר אוטומטית",
         # Select Data tab
         "tab_select_data": "בחירת נתונים",
@@ -134,7 +150,7 @@ TRANSLATIONS = {
         "slide_num": "Slide",
         "error_render": "Error rendering slide",
         "changes_saved": "Changes saved successfully",
-        "editing_info": "Edit the data in the table and click 'Update Preview' to see the changes",
+        "editing_info": "Edit the data in the table. The chart preview updates instantly. Click 'Save to Presentation' to apply to the file.",
         # Sidebar
         "slides": "Slides",
         "slide_n_charts": "Slide {n} ({count} charts)",
@@ -146,8 +162,15 @@ TRANSLATIONS = {
         "tab_csv": "CSV Import/Export",
         # Edit tab
         "comparison_toggle": "Before/After Comparison",
+        "chart_comparison_toggle": "Before/After",
+        "slide_comparison_toggle": "Before/After",
         "before": "Before",
         "after": "After",
+        "chart_preview": "Chart Preview",
+        "full_slide_preview": "Full Slide Preview",
+        "save_to_pptx": "Save to Presentation",
+        "saving_to_pptx": "Saving to presentation and rendering...",
+        "saved_to_pptx": "Changes saved to presentation successfully",
         "pct_columns_info": "Percentage columns: {cols} (enter 67 for 67%)",
         # Batch tab
         "batch_caption": "Add a new category (e.g. survey date) to all charts in the presentation at once",
@@ -189,9 +212,18 @@ TRANSLATIONS = {
         "excel_sheet_no_match": "Sheet '{sheet}' - no matching chart found",
         # Auto-save
         "auto_save_label": "Auto-save after updates",
-        "auto_save_info": "Automatically downloads the updated file after each change",
-        "unsaved_warning": "You have unsaved edits. Click \"Update Preview\" to apply and save.",
+        "auto_save_info": "Automatically downloads the updated file after clicking 'Save to Presentation'",
+        "unsaved_warning": "You have unsaved edits. Click 'Save to Presentation' to apply.",
         "auto_saved_msg": "File auto-saved",
+        "save_disabled_hint": "Edit data in the table to enable saving",
+        # Sidebar filter
+        "filter_slides": "Filter slides...",
+        # Onboarding
+        "onboarding_summary": "Found {slides} slides with {charts} charts. Select a slide from the sidebar to begin.",
+        # Undo
+        "undo": "Undo",
+        "undo_success": "Last change undone",
+        "no_undo": "Nothing to undo",
         # Select Data tab
         "tab_select_data": "Select Data",
         "select_data_caption": "Choose which series to display in the chart. Hidden series keep their data but are not plotted.",
