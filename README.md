@@ -8,11 +8,15 @@ Edit charts in PowerPoint presentations with a live visual preview.
 
 ## Features / תכונות
 
-- Upload `.pptx` and edit chart data in-browser
-- Live slide preview (before/after comparison)
+- Upload `.pptx` and edit chart data in-browser with a split-screen live preview
+- Before/after slide comparison view
 - Batch add rows to all charts at once
-- CSV import/export
-- Hebrew / English interface
+- Excel import/export for all charts (multi-sheet `.xlsx`)
+- CSV import/export per chart
+- Auto-save with automatic file download on changes
+- Percentage format preservation
+- Sidebar thumbnail navigation with slide filtering
+- Hebrew / English interface with full RTL support
 
 ---
 
@@ -83,6 +87,10 @@ pptx-chart-editor/
 │   └── slide_renderer.py  # Render slides via LibreOffice
 ├── ui/
 │   └── rtl_support.py     # i18n (Hebrew/English) + RTL CSS
+├── .streamlit/
+│   └── config.toml        # Streamlit theme/config
+├── .devcontainer/
+│   └── devcontainer.json  # Dev container config
 ├── requirements.txt       # Python dependencies
 ├── packages.txt           # System packages (Streamlit Cloud)
 ├── Dockerfile             # Docker image definition
