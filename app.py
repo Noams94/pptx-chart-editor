@@ -436,7 +436,11 @@ def show_interactive_wizard():
                 st.rerun()
 
     elif step == 1:
-        # File uploader only
+        # Show already uploaded file if exists
+        if "file_name" in st.session_state:
+            st.success(f"✅ {t('wizard_upload_done', name=st.session_state.file_name)}")
+
+        # File uploader
         wizard_file = st.file_uploader(
                 t("upload_label"),
                 type=["pptx"],
@@ -834,11 +838,7 @@ if not st.session_state.get("show_step3", False):
     col_back, _, col_next = st.columns([1, 2, 1])
     with col_back:
         if st.button(t("wizard_back"), use_container_width=True, key="step2_back"):
-            # Go back to wizard (reset file)
-            for k in ["pptx_bytes", "file_name", "charts_cache", "original_charts",
-                       "slide_images", "original_slide_images", "edited_data",
-                       "selected_slide", "series_visibility", "undo_stack"]:
-                st.session_state.pop(k, None)
+            # Go back to step 1 — keep the uploaded file
             st.session_state.wizard_step = 1
             st.rerun()
     with col_next:
