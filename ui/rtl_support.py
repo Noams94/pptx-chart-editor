@@ -185,6 +185,42 @@ TRANSLATIONS = {
         "wizard_upload_now": "העלה קובץ בסרגל הצדי",
         "wizard_file_uploaded": "קובץ הועלה",
         "quick_start": "התחלה מהירה",
+        # User Guide
+        "tab_guide": "מדריך למשתמש",
+        "guide_overview_title": "סקירה כללית",
+        "guide_overview_body": "עורך הגרפים מאפשר לערוך נתוני גרפים בתוך מצגות PowerPoint ישירות בדפדפן. העלו קובץ .pptx, שנו ערכים בטבלה אינטראקטיבית עם תצוגה מקדימה חיה, והורידו את המצגת המעודכנת — ללא צורך ב-PowerPoint.",
+        "guide_start_title": "איך מתחילים?",
+        "guide_start_1": "**העלאה** — גררו קובץ .pptx לאזור ההעלאה בסרגל הצדי, או לחצו לבחירת קובץ",
+        "guide_start_2": "**בחירת שקף** — לחצו על תמונה ממוזערת של שקף בסרגל הצדי",
+        "guide_start_3": "**בחירת גרף** — בחרו גרף מהתפריט הנפתח",
+        "guide_start_4": "**עריכת נתונים** — שנו ערכים בטבלה; התצוגה המקדימה מתעדכנת מיידית",
+        "guide_start_5": "**שמירה** — לחצו \"שמור במצגת\" ולאחר מכן הורידו את הקובץ המעודכן",
+        "guide_edit_title": "עריכת גרף",
+        "guide_edit_body": """- טבלת הנתונים מציגה קטגוריות (שורות) וסדרות (עמודות)
+- ערכו כל תא — תצוגת הגרף מתעדכנת בזמן אמת
+- השתמשו בלחצן **לפני/אחרי** להשוואה עם הגרף המקורי
+- לחצו **שמור במצגת** כדי לכתוב את השינויים בחזרה לקובץ
+- השתמשו ב**ביטול** כדי לחזור לשינוי האחרון""",
+        "guide_excel_title": "עריכה מרוכזת עם Excel",
+        "guide_excel_body": """- עברו ללשונית **ייבוא/ייצוא Excel**
+- לחצו **ייצא הכל ל-Excel** — מוריד קובץ .xlsx עם לשונית לכל גרף
+- ערכו את קובץ ה-Excel בכל תוכנת גיליונות
+- העלו את הקובץ המעודכן — האפליקציה מתאימה לשוניות לגרפים אוטומטית
+- בדקו את השינויים ולחצו **החל את כל הנתונים המותאמים**""",
+        "guide_csv_title": "ייבוא/ייצוא CSV",
+        "guide_csv_body": """- בלשונית **CSV**, ייצאו או ייבאו נתונים עבור הגרף הנבחר
+- קובץ ה-CSV חייב להתאים למבנה הגרף: עמודה ראשונה = קטגוריות, השאר = סדרות""",
+        "guide_batch_title": "הוספת שורה לכל הגרפים",
+        "guide_batch_body": """- בלשונית **הוספת שורה**, הקלידו שם קטגוריה חדשה (למשל תאריך סקר)
+- לחצו **הוסף שורה לכל הגרפים** כדי להוסיף אותה שורה לכל הגרפים בבת אחת""",
+        "guide_visibility_title": "בחירת נתונים (נראות סדרות)",
+        "guide_visibility_body": """- בלשונית **בחירת נתונים**, בחרו אילו סדרות יוצגו בגרף
+- סדרות מוסתרות שומרות על הנתונים שלהן אבל לא מוצגות
+- חייבת להיות לפחות סדרה אחת מוצגת""",
+        "guide_tips_title": "טיפים",
+        "guide_tips_body": """- **אחוזים**: בעמודות אחוזים, הקלידו 67 עבור 67% (המרה אוטומטית)
+- **שמירה אוטומטית**: הפעילו \"שמירה אוטומטית אחרי עדכון\" להורדה אוטומטית אחרי כל שמירה
+- **סינון שקפים**: השתמשו בתיבת החיפוש בסרגל הצדי לסינון לפי מספר שקף או שם גרף""",
     },
     "en": {
         # Page
@@ -363,6 +399,42 @@ TRANSLATIONS = {
         "wizard_upload_now": "Upload a file in the sidebar",
         "wizard_file_uploaded": "File uploaded",
         "quick_start": "Quick Start",
+        # User Guide
+        "tab_guide": "User Guide",
+        "guide_overview_title": "Overview",
+        "guide_overview_body": "PPTX Chart Editor lets you edit chart data inside PowerPoint presentations directly in your browser. Upload a .pptx file, modify chart values in an interactive table with a live preview, and download the updated presentation — no PowerPoint required.",
+        "guide_start_title": "Getting Started",
+        "guide_start_1": "**Upload** — Drag a .pptx file into the upload area in the sidebar, or click to browse",
+        "guide_start_2": "**Select a slide** — Click a slide thumbnail in the sidebar to see its charts",
+        "guide_start_3": "**Choose a chart** — Pick a chart from the dropdown to start editing",
+        "guide_start_4": "**Edit data** — Modify values in the table; the chart preview updates instantly",
+        "guide_start_5": "**Save** — Click \"Save to Presentation\" then download the updated file",
+        "guide_edit_title": "Editing a Chart",
+        "guide_edit_body": """- The data table shows categories (rows) and series (columns)
+- Edit any cell — the Plotly chart preview updates in real time
+- Use the **Before/After** toggle to compare your changes with the original
+- Click **Save to Presentation** to write changes back to the .pptx file
+- Use **Undo** to revert the last change""",
+        "guide_excel_title": "Bulk Editing with Excel",
+        "guide_excel_body": """- Go to the **Excel Import/Export** tab
+- Click **Export All to Excel** — downloads a .xlsx with one sheet per chart
+- Edit the Excel file in any spreadsheet app
+- Upload the modified .xlsx — the app matches sheets to charts automatically
+- Review the changes and click **Apply All Matched Data**""",
+        "guide_csv_title": "CSV Import/Export",
+        "guide_csv_body": """- In the **CSV** tab, export or import data for the currently selected chart
+- The CSV must match the chart structure: first column = categories, remaining = series""",
+        "guide_batch_title": "Add Row to All Charts",
+        "guide_batch_body": """- In the **Batch** tab, enter a new category name (e.g., a survey date)
+- Click **Add Row to All Charts** to add the same row to every chart at once""",
+        "guide_visibility_title": "Series Visibility",
+        "guide_visibility_body": """- In the **Select Data** tab, toggle which series are shown on the chart
+- Hidden series keep their data but are not plotted
+- At least one series must remain visible""",
+        "guide_tips_title": "Tips",
+        "guide_tips_body": """- **Percentages**: For percentage columns, enter 67 for 67% (automatic conversion)
+- **Auto-save**: Enable "Auto-save after updates" to automatically download after each save
+- **Slide filter**: Use the search box in the sidebar to filter slides by number or chart name""",
     },
 }
 
