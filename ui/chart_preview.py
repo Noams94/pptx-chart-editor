@@ -117,8 +117,17 @@ def render_chart_plotly(
 
     fig.update_layout(
         barmode=barmode,
-        margin=dict(t=30, b=30, l=50, r=30),
-        height=350,
+        margin=dict(t=40, b=40, l=50, r=30),
+        height=400,
+        template="plotly_white",
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        ),
+        hovermode="x unified",
     )
 
     if has_pct:

@@ -96,6 +96,13 @@ TRANSLATIONS = {
         "filter_slides": "סנן שקפים...",
         # Onboarding
         "onboarding_summary": "נמצאו {slides} שקפים עם {charts} גרפים. בחר שקף מהסרגל הצדי כדי להתחיל.",
+        "app_subtitle": "עריכת נתוני גרפים ב-PowerPoint בקלות ובמהירות",
+        "upload_section_title": "העלאת מצגת",
+        "preview_section_title": "תצוגה מקדימה",
+        "editor_section_title": "עריכת נתונים",
+        "no_slide_selected": "בחר שקף מהסרגל הצדי כדי להתחיל בעריכה",
+        "chart_details": "פרטי גרף",
+        "actions": "פעולות",
         # Undo
         "undo": "ביטול",
         "undo_success": "השינוי האחרון בוטל",
@@ -130,6 +137,54 @@ TRANSLATIONS = {
         "chart_area_stacked": "שטח מוערם",
         "chart_scatter": "פיזור",
         "chart_generic": "גרף",
+        # Progress indicator
+        "step_upload": "העלאה",
+        "step_select": "עריכת כל הגרפים",
+        "step_edit": "עריכת שקף",
+        "step_download": "הורדה",
+        # Workflow guidance
+        "welcome_message": "ברוכים הבאים לעורך הגרפים!",
+        "getting_started": "איך מתחילים?",
+        "step_1": "העלה קובץ PowerPoint (.pptx)",
+        "step_2": "בחר שקף וגרף לעריכה",
+        "step_3": "ערוך את הנתונים בטבלה",
+        "step_4": "הורד את הקובץ המעודכן",
+        # Accessibility
+        "filter_help": "סנן שקפים לפי מספר או שם גרף",
+        "series_visibility_help": "בחר אילו סדרות יוצגו בגרף. סדרות מוסתרות שומרות על הנתונים שלהן אבל לא מוצגות בגרף.",
+        "csv_help": "ייצא את הנתונים הנוכחיים ל-CSV או ייבא נתונים מקובץ CSV",
+        # Metrics
+        "total_slides": "סה\"כ שקפים",
+        "total_charts": "סה\"כ גרפים",
+        "chart_types": "סוגי גרפים",
+        "overview": "סקירה כללית",
+        "overview_description": "בחר שקף מהסרגל הצדי כדי להתחיל בעריכה. כל שקף מכיל מספר גרפים שניתן לערוך בנפרד.",
+        "tab_overview": "סקירה",
+        "charts": "גרפים",
+        "preview": "תצוגה מקדימה",
+        # Errors and feedback
+        "csv_imported_success": "CSV יובא בהצלחה",
+        "csv_import_error": "שגיאה בייבוא CSV",
+        "applying_csv": "מחיל נתונים מ-CSV...",
+        "undo_not_available": "ביטול לא זמין כרגע",
+        "slide_count_info": "{count} שקפים עם גרפים",
+        # Getting Started wizard
+        "wizard_welcome_title": "ברוכים הבאים לעורך הגרפים!",
+        "wizard_welcome_desc": "כלי זה מאפשר לך לערוך נתוני גרפים ישירות בתוך מצגות PowerPoint. בצע את השלבים הבאים כדי להתחיל.",
+        "wizard_upload_title": "העלאת מצגת",
+        "wizard_upload_desc": "גרור קובץ PowerPoint (.pptx) לאזור ההעלאה בסרגל הצדי, או לחץ על 'Browse files' לבחירת קובץ.",
+        "wizard_upload_waiting": "ממתין להעלאת קובץ...",
+        "wizard_upload_done": "הקובץ '{name}' הועלה בהצלחה!",
+        "wizard_select_title": "עריכת כל הגרפים",
+        "wizard_select_desc": "ייצא את כל הגרפים לקובץ Excel, ערוך אותם, וייבא בחזרה. דרך מהירה לעדכן את כל הנתונים בבת אחת.",
+        "wizard_edit_title": "עריכת שקף בודד",
+        "wizard_edit_desc": "בחר שקף מהסרגל הצדי, ערוך גרף ספציפי בטבלה, צפה בתצוגה מקדימה, ושמור במצגת.",
+        "wizard_next": "הבא",
+        "wizard_back": "הקודם",
+        "wizard_start_editing": "התחל לערוך",
+        "wizard_upload_now": "העלה קובץ בסרגל הצדי",
+        "wizard_file_uploaded": "קובץ הועלה",
+        "quick_start": "התחלה מהירה",
     },
     "en": {
         # Page
@@ -220,6 +275,13 @@ TRANSLATIONS = {
         "filter_slides": "Filter slides...",
         # Onboarding
         "onboarding_summary": "Found {slides} slides with {charts} charts. Select a slide from the sidebar to begin.",
+        "app_subtitle": "Edit PowerPoint chart data quickly and easily",
+        "upload_section_title": "Upload Presentation",
+        "preview_section_title": "Preview",
+        "editor_section_title": "Data Editor",
+        "no_slide_selected": "Select a slide from the sidebar to start editing",
+        "chart_details": "Chart Details",
+        "actions": "Actions",
         # Undo
         "undo": "Undo",
         "undo_success": "Last change undone",
@@ -253,6 +315,54 @@ TRANSLATIONS = {
         "chart_area_stacked": "Stacked Area",
         "chart_scatter": "Scatter",
         "chart_generic": "Chart",
+        # Progress indicator
+        "step_upload": "Upload",
+        "step_select": "Edit All Charts",
+        "step_edit": "Edit Slide",
+        "step_download": "Download",
+        # Workflow guidance
+        "welcome_message": "Welcome to Chart Editor!",
+        "getting_started": "Getting Started",
+        "step_1": "Upload a PowerPoint file (.pptx)",
+        "step_2": "Select a slide and chart to edit",
+        "step_3": "Edit the data in the table",
+        "step_4": "Download the updated file",
+        # Accessibility
+        "filter_help": "Filter slides by number or chart name",
+        "series_visibility_help": "Choose which series to display in the chart. Hidden series keep their data but are not plotted.",
+        "csv_help": "Export current data to CSV or import data from a CSV file",
+        # Metrics
+        "total_slides": "Total Slides",
+        "total_charts": "Total Charts",
+        "chart_types": "Chart Types",
+        "overview": "Overview",
+        "overview_description": "Select a slide from the sidebar to start editing. Each slide contains multiple charts that can be edited individually.",
+        "tab_overview": "Overview",
+        "charts": "Charts",
+        "preview": "Preview",
+        # Errors and feedback
+        "csv_imported_success": "CSV imported successfully",
+        "csv_import_error": "Error importing CSV",
+        "applying_csv": "Applying data from CSV...",
+        "undo_not_available": "Undo is not available at this time",
+        "slide_count_info": "{count} slides with charts",
+        # Getting Started wizard
+        "wizard_welcome_title": "Welcome to Chart Editor!",
+        "wizard_welcome_desc": "This tool lets you edit chart data directly inside PowerPoint presentations. Follow the steps below to get started.",
+        "wizard_upload_title": "Upload Presentation",
+        "wizard_upload_desc": "Drag a PowerPoint file (.pptx) into the upload area in the sidebar, or click 'Browse files' to select one.",
+        "wizard_upload_waiting": "Waiting for file upload...",
+        "wizard_upload_done": "File '{name}' uploaded successfully!",
+        "wizard_select_title": "Edit All Charts",
+        "wizard_select_desc": "Export all charts to an Excel file, edit them, and import back. A fast way to update all data at once.",
+        "wizard_edit_title": "Edit Single Slide",
+        "wizard_edit_desc": "Select a slide from the sidebar, edit a specific chart in the table, preview live, and save to the presentation.",
+        "wizard_next": "Next",
+        "wizard_back": "Back",
+        "wizard_start_editing": "Start Editing",
+        "wizard_upload_now": "Upload a file in the sidebar",
+        "wizard_file_uploaded": "File uploaded",
+        "quick_start": "Quick Start",
     },
 }
 
@@ -321,8 +431,10 @@ def inject_rtl_css():
         """
         <style>
         /* RTL for main content */
+        @import url('https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;700&display=swap');
         .stApp {
             direction: rtl;
+            font-family: 'Assistant', sans-serif;
         }
 
         /* Fix selectbox and other inputs */
@@ -337,12 +449,15 @@ def inject_rtl_css():
         h1, h2, h3, h4, h5, h6 {
             direction: rtl;
             text-align: right;
+            font-family: 'Assistant', sans-serif;
+            font-weight: 700;
         }
 
         /* Paragraphs and text */
         p, span, label, .stMarkdown {
             direction: rtl;
             text-align: right;
+            font-family: 'Assistant', sans-serif;
         }
 
         /* Data editor - keep LTR for numbers */

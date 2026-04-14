@@ -1,8 +1,9 @@
-"""PPTX Chart Editor - Streamlit App
+"""PPTX Chart Editor - Streamlit App with Enhanced UX/UI
 
 Split-screen tool for editing PowerPoint chart data with live slide preview.
-Features: thumbnail navigation, before/after comparison, CSV import/export,
-batch row addition across all charts, Hebrew/English language switching.
+Features: modern design, progress indicators, split-screen layout,
+thumbnail navigation, before/after comparison, CSV/Excel import/export,
+batch row addition, Hebrew/English language switching.
 """
 
 import base64
@@ -27,64 +28,296 @@ if "lang" not in st.session_state:
 # Page config
 st.set_page_config(
     page_title=t("page_title"),
+    page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 inject_rtl_css()
 
-# --- Footer (injected as fixed CSS so it shows regardless of st.stop) ---
-st.markdown(
-    """
+# --- Enhanced Custom CSS for Modern UI ---
+st.markdown("""
     <style>
+    /* Main container padding and spacing */
+    .main .block-container {
+        padding-top: 1.5rem;
+        padding-bottom: 5rem;
+        max-width: 1400px;
+    }
+
+    /* Typography improvements */
+    h1, h2, h3 {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        font-weight: 700;
+        letter-spacing: -0.5px;
+    }
+
+    /* Sidebar styling - modern design */
+    section[data-testid="stSidebar"] {
+        background: linear-gradient(135deg, #f5f7fa 0%, #f0f3f7 100%);
+        border-right: 1px solid #e0e6ed;
+    }
+
+    section[data-testid="stSidebar"] h2 {
+        color: #1a202c;
+        font-size: 1.1rem;
+        margin-top: 1.5rem;
+        margin-bottom: 1rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 700;
+    }
+
+    /* Slide button styling - improved visual hierarchy */
+    .stButton > button {
+        border-radius: 8px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        border: 1px solid transparent;
+    }
+
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .stButton > button[kind="primary"] {
+        background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+        color: white;
+    }
+
+    .stButton > button[kind="secondary"] {
+        background: white;
+        border: 1px solid #e0e6ed;
+        color: #4b5563;
+    }
+
+    /* Data editor styling */
+    .stDataEditor {
+        border: 1px solid #e0e6ed;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    /* Tabs styling - modern look */
+    [data-baseweb="tab-list"] {
+        border-bottom: 2px solid #e0e6ed;
+        gap: 2rem;
+    }
+
+    [data-baseweb="tab"] {
+        font-weight: 600;
+        color: #64748b;
+        padding: 0.75rem 0;
+    }
+
+    [data-baseweb="tab"][aria-selected="true"] {
+        color: #2563eb;
+        border-bottom: 3px solid #2563eb;
+    }
+
+    /* Info/Warning/Success messages - better styling */
+    .stAlert {
+        border-radius: 8px;
+        border-left: 4px solid;
+        padding: 1rem;
+    }
+
+    /* Divider styling */
+    hr {
+        border: none;
+        height: 1px;
+        background: linear-gradient(to right, transparent, #e0e6ed, transparent);
+        margin: 1.5rem 0;
+    }
+
+    /* Section headers with accent line */
+    .section-header {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin: 1.5rem 0 1rem 0;
+        padding-bottom: 0.75rem;
+        border-bottom: 2px solid #2563eb;
+    }
+
+    .section-header h3 {
+        margin: 0;
+        color: #1a202c;
+        font-size: 1.1rem;
+    }
+
+    /* Progress indicator styling */
+    .progress-indicator {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin: 1rem 0 1.5rem 0;
+        padding: 1rem 1.5rem;
+        background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+        border-radius: 12px;
+        border: 1px solid #bae6fd;
+        gap: 0;
+    }
+
+    .progress-step {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.4rem;
+        flex: 0 0 auto;
+        padding: 0 1.2rem;
+        position: relative;
+    }
+
+    .progress-connector {
+        width: 40px;
+        height: 2px;
+        background: #cbd5e1;
+        flex-shrink: 0;
+        margin-top: -12px;
+    }
+
+    .progress-connector.completed {
+        background: #10b981;
+    }
+
+    .progress-step-number {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: #cbd5e1;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.9rem;
+        transition: all 0.3s ease;
+    }
+
+    .progress-step.active .progress-step-number {
+        background: #2563eb;
+        box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.2);
+    }
+
+    .progress-step.completed .progress-step-number {
+        background: #10b981;
+    }
+
+    .progress-step-label {
+        font-size: 0.8rem;
+        color: #94a3b8;
+        font-weight: 600;
+        text-align: center;
+        white-space: nowrap;
+    }
+
+    .progress-step.active .progress-step-label {
+        color: #2563eb;
+        font-weight: 700;
+    }
+
+    .progress-step.completed .progress-step-label {
+        color: #10b981;
+    }
+
+    /* Wizard content card */
+    .wizard-card {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 0.75rem 1rem;
+        margin: 0.5rem 0;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        text-align: center;
+        min-height: 126px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .wizard-card h2 {
+        color: #1e293b;
+        margin-bottom: 0.25rem;
+        font-size: 1.1rem;
+    }
+
+    .wizard-card p {
+        color: #64748b;
+        font-size: 0.95rem;
+        line-height: 1.4;
+        max-width: 600px;
+        margin: 0 auto;
+    }
+
+    .wizard-icon {
+        font-size: 1.5rem;
+        margin-bottom: 0.25rem;
+        display: block;
+    }
+
+    /* Chart container styling */
+    .chart-container {
+        background: white;
+        border: 1px solid #e0e6ed;
+        border-radius: 8px;
+        padding: 1rem;
+        margin: 1rem 0;
+    }
+
+    /* Footer */
     .fixed-footer {
         position: fixed;
         bottom: 0;
         left: 0;
         width: 100%;
         background: white;
-        border-top: 1px solid #eee;
-        padding: 6px 0;
+        border-top: 1px solid #e0e6ed;
+        padding: 12px 0;
         text-align: center;
-        color: #888;
-        font-size: 0.8rem;
+        color: #64748b;
+        font-size: 0.85rem;
         z-index: 999;
         direction: ltr;
     }
-    .fixed-footer a { color: #888; text-decoration: none; }
-    .fixed-footer a:hover { color: #4A90D9; text-decoration: underline; }
+    .fixed-footer a {
+        color: #2563eb;
+        text-decoration: none;
+        font-weight: 600;
+        transition: color 0.2s ease;
+    }
+    .fixed-footer a:hover {
+        color: #1e40af;
+        text-decoration: underline;
+    }
     .stApp > .main { padding-bottom: 60px; }
+
+    /* Hide Streamlit branding */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .main .block-container {
+            padding-top: 1rem;
+        }
+        section[data-testid="stSidebar"] {
+            width: 100% !important;
+        }
+    }
     </style>
+
     <div class="fixed-footer">
         &copy; All Rights Reserved &middot; Dr. Noam Keshet &middot;
         <a href="https://noamkeshet.com" target="_blank">noamkeshet.com</a> &middot;
         <a href="mailto:keshet.noam@gmail.com">keshet.noam@gmail.com</a>
     </div>
-    """,
-    unsafe_allow_html=True,
-)
+""", unsafe_allow_html=True)
 
-# --- Language toggle (top of page) ---
-col_title, col_lang = st.columns([4, 1])
-with col_title:
-    st.title(t("page_title"))
-with col_lang:
-    lang_options = {"HE 🇮🇱": "he", "EN 🇺🇸": "en"}
-    current_label = "HE 🇮🇱" if st.session_state.lang == "he" else "EN 🇺🇸"
-    selected_lang_label = st.selectbox(
-        "🌐",
-        options=list(lang_options.keys()),
-        index=list(lang_options.keys()).index(current_label),
-        label_visibility="collapsed",
-    )
-    new_lang = lang_options[selected_lang_label]
-    if new_lang != st.session_state.lang:
-        st.session_state.lang = new_lang
-        st.session_state.charts_cache = None  # Re-extract with new language
-        st.rerun()
 
-st.caption(t("instructions"))
-
+# --- Helper Functions ---
 
 def get_chart_df(chart_info):
     """Get current DataFrame for a chart (edited version if exists, otherwise original)."""
@@ -138,19 +371,212 @@ def _commit_update(updated_bytes: bytes):
     st.rerun()
 
 
-# --- File Upload ---
-uploaded_file = st.file_uploader(
-    t("upload_label"),
-    type=["pptx"],
-    help=t("upload_help"),
-)
+def show_progress_indicator(current_step: int, total_steps: int = 3):
+    """Display a visual progress indicator showing the current workflow step."""
+    steps = [
+        t("step_upload"),
+        t("step_select"),
+        t("step_edit"),
+    ]
 
-if uploaded_file is None:
-    st.info(t("upload_label"))
+    parts = []
+    for i, step in enumerate(steps[:total_steps], 1):
+        if i < current_step:
+            state_class = "completed"
+        elif i == current_step:
+            state_class = "active"
+        else:
+            state_class = ""
+
+        if i > 1:
+            conn_class = "completed" if i <= current_step else ""
+            parts.append(f'<div class="progress-connector {conn_class}"></div>')
+
+        check = "✓" if i < current_step else str(i)
+        parts.append(
+            f'<div class="progress-step {state_class}">'
+            f'<div class="progress-step-number">{check}</div>'
+            f'<div class="progress-step-label">{step}</div>'
+            f'</div>'
+        )
+
+    html = '<div class="progress-indicator">' + ''.join(parts) + '</div>'
+    st.markdown(html, unsafe_allow_html=True)
+
+
+def show_interactive_wizard():
+    """Display the interactive Getting Started wizard with clickable steps.
+
+    Step 0 = Welcome landing (no progress active)
+    Step 1 = Upload explanation (step 1 active)
+    Step 2 = Select explanation (step 2 active)
+    Step 3 = Edit explanation (step 3 active)
+    Step 4 = Download explanation (step 4 active)
+    """
+    if "wizard_step" not in st.session_state:
+        st.session_state.wizard_step = 0
+
+    step = st.session_state.wizard_step
+
+    # Welcome title + description on landing (step 0)
+    if step == 0:
+        st.markdown(f"### 👋 {t('wizard_welcome_title')}")
+        st.markdown(f"*{t('wizard_welcome_desc')}*")
+
+    # Render progress bar (step 0 means none active)
+    show_progress_indicator(step)
+
+    # --- Step content ---
+    if step == 0:
+        # Landing — just Next button
+        _, col_next, _ = st.columns([2, 1, 2])
+        with col_next:
+            if st.button(t("wizard_next"), type="primary", use_container_width=True, key="wiz_next_0"):
+                st.session_state.wizard_step = 1
+                st.rerun()
+
+    elif step == 1:
+        # File uploader only
+        wizard_file = st.file_uploader(
+                t("upload_label"),
+                type=["pptx"],
+                help=t("upload_help"),
+                key="wizard_main_uploader",
+                label_visibility="collapsed",
+            )
+        if wizard_file:
+            # Only initialize on first upload (avoid rerun loop)
+            if st.session_state.get("file_name") != wizard_file.name:
+                st.session_state.pptx_bytes = wizard_file.getvalue()
+                st.session_state.file_name = wizard_file.name
+                st.session_state.slide_images = None
+                st.session_state.original_slide_images = None
+                st.session_state.edited_data = {}
+                st.session_state.selected_slide = None
+                st.session_state.show_chart_comparison = False
+                st.session_state.show_slide_comparison = False
+                st.session_state.original_charts = None
+                st.session_state.charts_cache = None
+                st.session_state.series_visibility = {}
+                st.session_state.undo_stack = []
+                st.rerun()
+            st.success(f"✅ {t('wizard_upload_done', name=wizard_file.name)}")
+
+        col_back, _, col_next = st.columns([1, 2, 1])
+        with col_back:
+            if st.button(t("wizard_back"), use_container_width=True, key="wiz_back_1"):
+                st.session_state.wizard_step = 0
+                st.rerun()
+        with col_next:
+            if st.button(t("wizard_next"), type="primary", use_container_width=True, key="wiz_next_1"):
+                st.session_state.wizard_step = 2
+                st.rerun()
+
+    elif step == 2:
+        # Edit all charts (Excel)
+        st.markdown(
+            '<div class="wizard-card">'
+            '<span class="wizard-icon">📊</span>'
+            f'<h2>{t("wizard_select_title")}</h2>'
+            f'<p>{t("wizard_select_desc")}</p>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
+        # Edit single slide
+        st.markdown(
+            '<div class="wizard-card">'
+            '<span class="wizard-icon">🖼️</span>'
+            f'<h2>{t("wizard_edit_title")}</h2>'
+            f'<p>{t("wizard_edit_desc")}</p>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
+        col_back, _, col_start = st.columns([1, 2, 1])
+        with col_back:
+            if st.button(t("wizard_back"), use_container_width=True, key="wiz_back_2"):
+                st.session_state.wizard_step = 1
+                st.rerun()
+        with col_start:
+            if st.button(t("wizard_start_editing"), type="primary", use_container_width=True, key="wiz_start"):
+                st.session_state.wizard_step = 0
+                st.rerun()
+
+
+# --- Header with Language Selector ---
+col_title, col_lang = st.columns([4, 1])
+with col_title:
+    st.title(t("page_title"))
+    st.markdown(f"*{t('app_subtitle')}*")
+with col_lang:
+    lang_options = {"עברית 🇮🇱": "he", "English 🇺🇸": "en"}
+    current_label = "עברית 🇮🇱" if st.session_state.lang == "he" else "English 🇺🇸"
+    selected_lang_label = st.selectbox(
+        "Language / שפה",
+        options=list(lang_options.keys()),
+        index=list(lang_options.keys()).index(current_label),
+        label_visibility="collapsed",
+    )
+    new_lang = lang_options[selected_lang_label]
+    if new_lang != st.session_state.lang:
+        st.session_state.lang = new_lang
+        st.session_state.charts_cache = None
+        st.rerun()
+
+st.divider()
+
+# --- Sidebar with Enhanced Design ---
+with st.sidebar:
+    # Show "Quick Start" title only on landing screen (no file uploaded yet)
+    if "pptx_bytes" not in st.session_state:
+        st.markdown(f"### ⚡ {t('quick_start')}")
+
+    st.header(f"📁 {t('upload_section_title')}")
+    uploaded_file = st.file_uploader(
+        t("upload_label"),
+        type=["pptx"],
+        help=t("upload_help"),
+        label_visibility="collapsed"
+    )
+
+    # Show sidebar controls if file is loaded (from sidebar OR wizard uploader)
+    if uploaded_file or "pptx_bytes" in st.session_state:
+        st.session_state.setdefault("auto_save", True)
+        auto_save_enabled = st.checkbox(
+            t("auto_save_label"),
+            value=st.session_state.auto_save,
+            help=t("auto_save_info"),
+        )
+
+        # Only show SLIDES section in step 3
+        if st.session_state.get("show_step3", False):
+            st.divider()
+            st.header(f"🖼️ {t('slides')}")
+
+            # Slide filter
+            slide_filter = st.text_input(
+                t("filter_slides"),
+                placeholder=t("filter_slides"),
+                label_visibility="collapsed",
+                help=t("filter_help"),
+            )
+        else:
+            slide_filter = ""
+    else:
+        slide_filter = ""
+
+# Check if we have a file from either the sidebar uploader or the wizard uploader
+has_file = uploaded_file is not None or "pptx_bytes" in st.session_state
+
+if not has_file:
+    # No file from any source — show wizard
+    show_interactive_wizard()
     st.stop()
 
 # --- Initialize Session State ---
-if "pptx_bytes" not in st.session_state or st.session_state.get("file_name") != uploaded_file.name:
+# If the sidebar uploader has a (new) file, use it
+if uploaded_file is not None and st.session_state.get("file_name") != uploaded_file.name:
     st.session_state.pptx_bytes = uploaded_file.getvalue()
     st.session_state.file_name = uploaded_file.name
     st.session_state.slide_images = None
@@ -163,6 +589,7 @@ if "pptx_bytes" not in st.session_state or st.session_state.get("file_name") != 
     st.session_state.charts_cache = None
     st.session_state.series_visibility = {}
     st.session_state.undo_stack = []
+# If no sidebar file but we have pptx_bytes from wizard, that's already initialized
 
 # --- Auto-download trigger (fires after rerun following an update) ---
 if st.session_state.pop("pending_auto_download", False):
@@ -176,17 +603,17 @@ if st.session_state.pop("pending_auto_download", False):
         </script>""",
         height=0,
     )
-    st.toast(t("auto_saved_msg"))
+    st.toast(t("auto_saved_msg"), icon="✅")
 
 # --- Extract Charts (cached in session state) ---
 if st.session_state.get("charts_cache") is None:
-    st.session_state.charts_cache = extract_all_charts(st.session_state.pptx_bytes)
-    # Store original chart data for before/after Plotly comparison
-    if st.session_state.original_charts is None:
-        st.session_state.original_charts = {
-            (c.slide_index, c.shape_name): c.dataframe.copy()
-            for c in st.session_state.charts_cache
-        }
+    with st.spinner(t("rendering")):
+        st.session_state.charts_cache = extract_all_charts(st.session_state.pptx_bytes)
+        if st.session_state.original_charts is None:
+            st.session_state.original_charts = {
+                (c.slide_index, c.shape_name): c.dataframe.copy()
+                for c in st.session_state.charts_cache
+            }
 
 charts = st.session_state.charts_cache
 
@@ -194,97 +621,64 @@ if not charts:
     st.warning(t("no_charts"))
     st.stop()
 
-# --- Onboarding summary ---
-num_slides = len({c.slide_index for c in charts})
-st.info(t("onboarding_summary", slides=num_slides, charts=len(charts)))
-
-# --- Render Slides (lazy — triggered by button or on first load) ---
-if st.session_state.slide_images is None:
-    render_col, _ = st.columns([1, 3])
-    with render_col:
-        if st.button(t("render_preview_btn"), type="primary", use_container_width=True):
-            with st.spinner(t("rendering")):
-                try:
-                    st.session_state.slide_images = render_slides(st.session_state.pptx_bytes)
-                    st.session_state.original_slide_images = list(st.session_state.slide_images)
-                    st.rerun()
-                except RuntimeError as e:
-                    st.error(str(e))
-    st.info(t("render_hint"))
-
-# --- Group charts by slide (computed once) ---
+# --- Group charts by slide ---
 charts_by_slide = defaultdict(list)
 for c in charts:
     charts_by_slide[c.slide_index].append(c)
 
-# --- Sidebar: Slide Thumbnails ---
+# --- Sidebar: Slide List with Thumbnails (only in step 3) ---
 slide_images = st.session_state.slide_images or []
 
-with st.sidebar:
-    # Auto-save toggle
-    st.session_state.setdefault("auto_save", True)
-    auto_save = st.checkbox(
-        t("auto_save_label"),
-        value=st.session_state.auto_save,
-        help=t("auto_save_info"),
-    )
-    st.session_state.auto_save = auto_save
+if st.session_state.get("show_step3", False):
+    with st.sidebar:
+        st.caption(t("slide_count_info", count=len(charts_by_slide)))
+
+        for slide_idx in sorted(charts_by_slide):
+            if slide_filter:
+                slide_num_str = str(slide_idx + 1)
+                chart_names = " ".join(c.chart_title or c.shape_name for c in charts_by_slide[slide_idx]).lower()
+                if slide_filter.lower() not in slide_num_str and slide_filter.lower() not in chart_names:
+                    continue
+
+            is_selected = st.session_state.selected_slide == slide_idx
+            btn_label = t("slide_n_charts", n=slide_idx + 1, count=len(charts_by_slide[slide_idx]))
+
+            if st.button(
+                btn_label,
+                key=f"slide_btn_{slide_idx}",
+                use_container_width=True,
+                type="primary" if is_selected else "secondary"
+            ):
+                st.session_state.selected_slide = slide_idx
+                st.rerun()
+
+            # Show thumbnail if available
+            if slide_idx < len(slide_images):
+                st.image(slide_images[slide_idx], use_container_width=True)
+            st.divider()
+
+
+# ==================== MAIN CONTENT AREA ====================
+
+if not st.session_state.get("show_step3", False):
+    # --- Step 2: Edit all charts via Excel ---
+    show_progress_indicator(2)
+
+    st.success(f"✅ {t('wizard_upload_done', name=st.session_state.file_name)}")
+
+    # Overview metrics
+    overview_cols = st.columns(3)
+    with overview_cols[0]:
+        st.metric(t("total_slides"), len(charts_by_slide))
+    with overview_cols[1]:
+        st.metric(t("total_charts"), len(charts))
+    with overview_cols[2]:
+        st.metric(t("chart_types"), len(set(c.chart_type_name for c in charts)))
+
     st.divider()
 
-    st.subheader(t("slides"))
-
-    slide_filter = st.text_input(t("filter_slides"), key="slide_filter", label_visibility="collapsed", placeholder=t("filter_slides"))
-
-    for slide_idx in sorted(charts_by_slide):
-        # Filter by slide number or chart name
-        if slide_filter:
-            slide_num_str = str(slide_idx + 1)
-            chart_names = " ".join(c.chart_title or c.shape_name for c in charts_by_slide[slide_idx]).lower()
-            if slide_filter.lower() not in slide_num_str and slide_filter.lower() not in chart_names:
-                continue
-        chart_count = len(charts_by_slide[slide_idx])
-        is_selected = st.session_state.selected_slide == slide_idx
-        label = t("slide_n_charts", n=slide_idx + 1, count=chart_count)
-
-        if is_selected:
-            st.markdown(f"**► {label}**")
-        else:
-            st.caption(label)
-
-        if st.sidebar.button(
-            t("select_slide_n", n=slide_idx + 1),
-            key=f"thumb_{slide_idx}",
-            use_container_width=True,
-        ):
-            st.session_state.selected_slide = slide_idx
-            st.rerun()
-
-        if slide_idx < len(slide_images):
-            st.image(slide_images[slide_idx], use_container_width=True)
-        st.divider()
-
-# --- Chart Selector (filtered by selected slide) ---
-if st.session_state.selected_slide is not None:
-    filtered_indices = {i for i, c in enumerate(charts) if c.slide_index == st.session_state.selected_slide}
-else:
-    filtered_indices = set(range(len(charts)))
-
-chart_options = {
-    f"{t('slide_num')} {c.slide_index + 1} - {c.chart_title or c.shape_name} ({c.chart_type_name})": i
-    for i, c in enumerate(charts)
-    if i in filtered_indices
-}
-
-if not chart_options:
-    st.info(t("no_charts_in_slide"))
-    st.stop()
-
-# ==================== GLOBAL TABS (all charts) ====================
-tab_excel, tab_batch = st.tabs([t("tab_excel"), t("tab_batch")])
-
-# --- EXCEL IMPORT/EXPORT (ALL CHARTS) ---
-with tab_excel:
-    st.subheader(t("tab_excel"))
+    # --- STEP 2: EXCEL IMPORT/EXPORT (ALL CHARTS) ---
+    st.subheader(f"📊 {t('tab_excel')}")
 
     col_export_xl, col_import_xl = st.columns(2, gap="large")
 
@@ -295,7 +689,6 @@ with tab_excel:
 
         sheet_name_map = _build_sheet_name_map(charts)
 
-        # Cache xlsx bytes — only rebuild when chart data changes
         edit_fingerprint = str(sorted(st.session_state.edited_data.keys()))
         if (st.session_state.get("xl_export_fingerprint") != edit_fingerprint
                 or "xl_export_bytes" not in st.session_state):
@@ -331,12 +724,10 @@ with tab_excel:
     if xl_file is not None:
         st.divider()
         try:
-            # Cache import parsing — only re-parse when a new file is uploaded
             xl_cache_key = (xl_file.name, xl_file.size)
             if st.session_state.get("xl_import_cache_key") != xl_cache_key:
                 xls = pd.ExcelFile(xl_file, engine="openpyxl")
 
-                # Build reverse lookup: sheet name -> chart_info (using same dedup as export)
                 sheet_to_chart = {v: k for k, v in sheet_name_map.items()}
                 charts_by_key = {(ci.slide_index, ci.shape_name): ci for ci in charts}
 
@@ -409,9 +800,9 @@ with tab_excel:
         except Exception as e:
             st.error(t("file_read_error", e=e))
 
-# --- BATCH ADD ROW ---
-with tab_batch:
-    st.subheader(t("tab_batch"))
+    # --- BATCH ADD ROW (all charts) ---
+    st.divider()
+    st.subheader(f"➕ {t('tab_batch')}")
     st.caption(t("batch_caption"))
 
     new_category = st.text_input(t("new_category_label"), key="batch_category")
@@ -419,130 +810,128 @@ with tab_batch:
     if new_category:
         st.markdown(f"**{t('batch_preview', name=new_category, count=len(charts))}**")
 
-        if st.button(t("batch_button"), type="primary", use_container_width=True):
+        if st.button(t("batch_button"), type="primary", use_container_width=True, key="batch_btn_step2"):
             with st.spinner(t("batch_spinner")):
                 try:
                     updates = []
                     for chart_info in charts:
                         df = get_chart_df(chart_info)
-
                         new_row = {df.columns[0]: new_category}
                         for col in df.columns[1:]:
                             new_row[col] = None
                         df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-
-                        chart_key = (chart_info.slide_index, chart_info.shape_name)
-                        st.session_state.edited_data[chart_key] = df
-                        updates.append((
-                            chart_info.slide_index,
-                            chart_info.shape_name,
-                            df,
-                            chart_info.is_xy,
-                            chart_info.series_formats,
-                        ))
-
-                    updated_bytes = update_multiple_charts(
-                        st.session_state.pptx_bytes, updates,
-                    )
+                        ck = (chart_info.slide_index, chart_info.shape_name)
+                        st.session_state.edited_data[ck] = df
+                        updates.append((chart_info.slide_index, chart_info.shape_name, df, chart_info.is_xy, chart_info.series_formats))
+                    updated_bytes = update_multiple_charts(st.session_state.pptx_bytes, updates)
                     st.success(t("batch_success", name=new_category, count=len(charts)))
                     _commit_update(updated_bytes)
                 except Exception as e:
                     st.error(t("error_generic", e=e))
 
+    # --- Navigation buttons ---
+    st.divider()
+    col_back, _, col_next = st.columns([1, 2, 1])
+    with col_back:
+        if st.button(t("wizard_back"), use_container_width=True, key="step2_back"):
+            # Go back to wizard (reset file)
+            for k in ["pptx_bytes", "file_name", "charts_cache", "original_charts",
+                       "slide_images", "original_slide_images", "edited_data",
+                       "selected_slide", "series_visibility", "undo_stack"]:
+                st.session_state.pop(k, None)
+            st.session_state.wizard_step = 1
+            st.rerun()
+    with col_next:
+        if st.button(t("wizard_next"), type="primary", use_container_width=True, key="step2_next"):
+            st.session_state.show_step3 = True
+            st.rerun()
 
-st.divider()
+    # If user hasn't clicked Next to step 3, stop here
+    if not st.session_state.get("show_step3", False):
+        st.stop()
 
-# ==================== PER-CHART SECTION ====================
-selected_label = st.selectbox(t("select_chart"), options=list(chart_options.keys()))
-selected_idx = chart_options[selected_label]
-selected_chart = charts[selected_idx]
-slide_idx = selected_chart.slide_index
 
-tab_edit, tab_select_data, tab_csv = st.tabs([t("tab_edit"), t("tab_select_data"), t("tab_csv")])
+# ==================== STEP 3: SELECTED SLIDE VIEW - SPLIT SCREEN ====================
 
-# --- EDIT CHART ---
-with tab_edit:
-    chart_key = (selected_chart.slide_index, selected_chart.shape_name)
-    current_df = get_chart_df(selected_chart)
-    current_vis = st.session_state.get("series_visibility", {}).get(
-        chart_key, selected_chart.series_visibility
-    )
+show_progress_indicator(3)
 
-    # --- Data Editor (full width, first) ---
-    st.subheader(t("data_editor"))
-    st.caption(f"{t('chart_type')}: {selected_chart.chart_type_name}")
+# Show slide selection UI if none selected yet
+if st.session_state.selected_slide is None:
+    # Render preview button above the slides grid
+    if st.session_state.slide_images is None:
+        render_col, _ = st.columns([1, 3])
+        with render_col:
+            if st.button(t("render_preview_btn"), type="primary", use_container_width=True, key="step3_render"):
+                with st.spinner(t("rendering")):
+                    try:
+                        st.session_state.slide_images = render_slides(st.session_state.pptx_bytes)
+                        st.session_state.original_slide_images = list(st.session_state.slide_images)
+                        st.rerun()
+                    except RuntimeError as e:
+                        st.error(str(e))
+        st.caption(t("render_hint"))
 
-    pct_cols = [
-        col for col in selected_chart.dataframe.columns[1:]
-        if is_percentage_format(selected_chart.series_formats.get(col, ""))
-    ]
-    if pct_cols:
-        st.caption(t("pct_columns_info", cols=", ".join(pct_cols)))
-    st.caption(t("editing_info"))
+    # Show slide selection grid
+    st.subheader(f"🖼️ {t('slides')}")
+    st.caption(t("no_slide_selected"))
 
-    editor_key = f"editor_{selected_chart.slide_index}_{selected_chart.shape_name}"
-
-    # Build column config with widths based on content
-    _edit_df = get_chart_df(selected_chart)
-    _col_config = {}
-    for col in _edit_df.columns:
-        max_len = max(len(str(col)), _edit_df[col].astype(str).str.len().max() if len(_edit_df) > 0 else 0)
-        if max_len <= 6:
-            _col_config[col] = st.column_config.Column(width="small")
-        elif max_len <= 15:
-            _col_config[col] = st.column_config.Column(width="medium")
-        else:
-            _col_config[col] = st.column_config.Column(width="large")
-
-    edited_df = st.data_editor(
-        _edit_df,
-        num_rows="dynamic",
-        use_container_width=True,
-        column_config=_col_config,
-        key=editor_key,
-    )
-
-    # Push to undo stack if data changed
-    prev_df = st.session_state.edited_data.get(chart_key)
-    if prev_df is not None and not edited_df.equals(prev_df):
-        st.session_state.setdefault("undo_stack", []).append((chart_key, prev_df.copy()))
-    st.session_state.edited_data[chart_key] = edited_df
-
-    has_unsaved = not edited_df.equals(selected_chart.dataframe)
-    if has_unsaved:
-        st.warning(t("unsaved_warning"))
-
-    col_undo, col_save, col_render, col_download = st.columns([1, 1, 1, 1], gap="medium")
-    with col_undo:
-        undo_stack = st.session_state.get("undo_stack", [])
-        if st.button(t("undo"), use_container_width=True, disabled=len(undo_stack) == 0):
-            if undo_stack:
-                undo_key, undo_df = undo_stack.pop()
-                st.session_state.edited_data[undo_key] = undo_df
-                st.success(t("undo_success"))
+    num_cols = min(4, len(charts_by_slide))
+    slide_cols = st.columns(num_cols, gap="medium")
+    for col_i, s_idx in enumerate(sorted(charts_by_slide)):
+        with slide_cols[col_i % num_cols]:
+            btn_label = t("slide_n_charts", n=s_idx + 1, count=len(charts_by_slide[s_idx]))
+            if st.button(btn_label, key=f"main_slide_btn_{s_idx}", use_container_width=True, type="secondary"):
+                st.session_state.selected_slide = s_idx
                 st.rerun()
-    with col_save:
-        if st.button(t("save_to_pptx"), type="primary", use_container_width=True, disabled=not has_unsaved, help=None if has_unsaved else t("save_disabled_hint")):
-            with st.spinner(t("saving_to_pptx")):
+            # Show thumbnail if available
+            s_images = st.session_state.slide_images or []
+            if s_idx < len(s_images):
+                st.image(s_images[s_idx], use_container_width=True)
+
+    st.divider()
+    col_back3, _, _ = st.columns([1, 2, 1])
+    with col_back3:
+        if st.button(t("wizard_back"), use_container_width=True, key="step3_back_noselection"):
+            st.session_state.show_step3 = False
+            st.rerun()
+    st.stop()
+
+slide_idx = st.session_state.selected_slide
+slide_charts = charts_by_slide[slide_idx]
+
+# Back button to return to step 2
+col_back_s3, _ = st.columns([1, 5])
+with col_back_s3:
+    if st.button(f"← {t('wizard_back')}", use_container_width=True, key="step3_back_editing"):
+        st.session_state.selected_slide = None
+        st.session_state.show_step3 = False
+        st.rerun()
+
+# Layout: Left (Preview) | Right (Editor)
+col_preview, col_editor = st.columns([1, 1], gap="large")
+
+# --- LEFT COLUMN: Preview ---
+with col_preview:
+    st.markdown(f"### 👁️ {t('preview_section_title')}")
+
+    # Slide image preview
+    if st.session_state.slide_images is None:
+        if st.button(t("render_preview_btn"), type="primary", use_container_width=True):
+            with st.spinner(t("rendering")):
                 try:
-                    updated_bytes = update_chart_data(
-                        st.session_state.pptx_bytes,
-                        selected_chart.slide_index,
-                        selected_chart.shape_name,
-                        edited_df,
-                        selected_chart.is_xy,
-                        selected_chart.series_formats,
-                        current_vis,
-                    )
-                    st.session_state.pptx_bytes = updated_bytes
-                    st.session_state.charts_cache = None
-                    st.session_state.edited_data.pop(chart_key, None)
-                    _schedule_auto_download()
-                    st.success(t("saved_to_pptx"))
+                    st.session_state.slide_images = render_slides(st.session_state.pptx_bytes)
+                    st.session_state.original_slide_images = list(st.session_state.slide_images)
                     st.rerun()
-                except Exception as e:
-                    st.error(f"{t('error_render')}: {e}")
-    with col_render:
+                except RuntimeError as e:
+                    st.error(str(e))
+        st.caption(t("render_hint"))
+    else:
+        if slide_idx < len(st.session_state.slide_images):
+            st.image(
+                st.session_state.slide_images[slide_idx],
+                use_container_width=True,
+                caption=f"{t('slide_num')} {slide_idx + 1}",
+            )
         if st.button(t("update_preview"), use_container_width=True):
             with st.spinner(t("rendering")):
                 try:
@@ -550,31 +939,50 @@ with tab_edit:
                     st.rerun()
                 except Exception as e:
                     st.error(f"{t('error_render')}: {e}")
-    with col_download:
-        st.download_button(
-            label=t("download"),
-            data=st.session_state.pptx_bytes,
-            file_name=f"updated_{st.session_state.file_name}",
-            mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-            use_container_width=True,
-        )
 
     st.divider()
 
-    # --- Plotly Chart Preview (Before / After) ---
+    # Chart Selection
+    st.markdown(f"#### {t('select_chart')}")
+    chart_options = {
+        f"{c.chart_title or c.shape_name} ({c.chart_type_name})": i
+        for i, c in enumerate(slide_charts)
+    }
+
+    if not chart_options:
+        st.info(t("no_charts_in_slide"))
+        st.stop()
+
+    selected_label = st.selectbox(
+        t("select_chart"),
+        options=list(chart_options.keys()),
+        label_visibility="collapsed",
+    )
+    selected_idx = chart_options[selected_label]
+    selected_chart = slide_charts[selected_idx]
+
+    chart_key = (selected_chart.slide_index, selected_chart.shape_name)
+    current_df = get_chart_df(selected_chart)
+    current_vis = st.session_state.get("series_visibility", {}).get(
+        chart_key, selected_chart.series_visibility
+    )
+
+    # Plotly Chart Preview with Before/After
     col_chart_title, col_chart_toggle = st.columns([3, 1])
     with col_chart_title:
         st.markdown(f"**{t('chart_preview')}**")
     with col_chart_toggle:
         show_chart_comparison = st.checkbox(
-            t("chart_comparison_toggle"), value=st.session_state.show_chart_comparison,
+            t("chart_comparison_toggle"),
+            value=st.session_state.show_chart_comparison,
             key="chart_comp_toggle",
         )
         st.session_state.show_chart_comparison = show_chart_comparison
+
     if show_chart_comparison:
         chart_col_before, chart_col_after = st.columns(2, gap="medium")
         with chart_col_before:
-            st.subheader(t("before"))
+            st.caption(t("before"))
             original_df = st.session_state.original_charts.get(chart_key)
             if original_df is not None:
                 fig_before = render_chart_plotly(
@@ -583,7 +991,7 @@ with tab_edit:
                 )
                 st.plotly_chart(fig_before, use_container_width=True, key=f"plotly_before_{chart_key}")
         with chart_col_after:
-            st.subheader(t("after"))
+            st.caption(t("after"))
             fig_after = render_chart_plotly(
                 current_df, selected_chart.chart_type,
                 current_vis, selected_chart.series_formats,
@@ -596,172 +1004,293 @@ with tab_edit:
         )
         st.plotly_chart(fig_current, use_container_width=True, key=f"plotly_current_{chart_key}")
 
-    # --- Full Slide Preview (Before / After) ---
+    # Full Slide Before/After comparison
     col_slide_title, col_slide_toggle = st.columns([3, 1])
     with col_slide_title:
         st.markdown(f"**{t('full_slide_preview')}**")
     with col_slide_toggle:
         show_slide_comparison = st.checkbox(
-            t("slide_comparison_toggle"), value=st.session_state.show_slide_comparison,
+            t("slide_comparison_toggle"),
+            value=st.session_state.show_slide_comparison,
             key="slide_comp_toggle",
         )
         st.session_state.show_slide_comparison = show_slide_comparison
+
     if show_slide_comparison:
         slide_col_before, slide_col_after = st.columns(2, gap="medium")
         with slide_col_before:
-            st.subheader(t("before"))
+            st.caption(t("before"))
             original_images = st.session_state.original_slide_images or []
             if original_images and slide_idx < len(original_images):
                 st.image(original_images[slide_idx], use_container_width=True)
         with slide_col_after:
-            st.subheader(t("after"))
+            st.caption(t("after"))
             if slide_images and slide_idx < len(slide_images):
-                st.image(
-                    slide_images[slide_idx],
-                    use_container_width=True,
-                    caption=f"{t('slide_num')} {slide_idx + 1}",
-                )
+                st.image(slide_images[slide_idx], use_container_width=True,
+                         caption=f"{t('slide_num')} {slide_idx + 1}")
             else:
                 st.info(t("render_hint"))
     else:
-        if slide_images and slide_idx < len(slide_images):
-            st.image(
-                slide_images[slide_idx],
-                use_container_width=True,
-                caption=f"{t('slide_num')} {slide_idx + 1}",
-            )
-        else:
-            st.info(t("render_hint"))
+        # Only show if not already shown above
+        pass
 
-# --- SELECT DATA (Series Visibility) ---
-with tab_select_data:
-    st.subheader(t("tab_select_data"))
-    st.caption(t("select_data_caption"))
 
-    # Initialize visibility state from chart metadata if not already set
-    vis_key = (selected_chart.slide_index, selected_chart.shape_name)
-    if "series_visibility" not in st.session_state:
-        st.session_state.series_visibility = {}
-    if vis_key not in st.session_state.series_visibility:
-        st.session_state.series_visibility[vis_key] = dict(selected_chart.series_visibility)
+# --- RIGHT COLUMN: Editor ---
+with col_editor:
+    st.markdown(f"### 📝 {t('editor_section_title')}")
 
-    current_visibility = st.session_state.series_visibility[vis_key]
+    tab_edit, tab_select_data, tab_csv, tab_batch = st.tabs([t("tab_edit"), t("tab_select_data"), t("tab_csv"), t("tab_batch")])
 
-    # Get series names (skip category column for non-XY charts)
-    if selected_chart.is_xy:
-        series_display_names = selected_chart.series_names
-    else:
-        series_display_names = list(selected_chart.series_visibility.keys())
+    # --- EDIT CHART TAB ---
+    with tab_edit:
+        st.markdown(f"**{selected_chart.chart_title or selected_chart.shape_name}**")
+        st.caption(f"{t('chart_type')}: {selected_chart.chart_type_name}")
 
-    # Show checkboxes per series
-    st.markdown(f"**{t('series_visible_label')}**")
-    updated_visibility = {}
-    for name in series_display_names:
-        visible = current_visibility.get(name, True)
-        updated_visibility[name] = st.checkbox(
-            name,
-            value=visible,
-            key=f"vis_{selected_chart.slide_index}_{selected_chart.shape_name}_{name}",
-        )
+        pct_cols = [
+            col for col in selected_chart.dataframe.columns[1:]
+            if is_percentage_format(selected_chart.series_formats.get(col, ""))
+        ]
+        if pct_cols:
+            st.info(t("pct_columns_info", cols=", ".join(pct_cols)))
 
-    # Validation — at least one series must be visible
-    visible_count = sum(1 for v in updated_visibility.values() if v)
-    hidden_count = len(updated_visibility) - visible_count
+        st.caption(t("editing_info"))
 
-    if hidden_count > 0:
-        st.info(t("hidden_series_count", count=hidden_count))
-    else:
-        st.success(t("all_series_visible"))
+        # Build column config with widths based on content
+        _edit_df = get_chart_df(selected_chart)
+        _col_config = {}
+        for col in _edit_df.columns:
+            max_len = max(len(str(col)), _edit_df[col].astype(str).str.len().max() if len(_edit_df) > 0 else 0)
+            if max_len <= 6:
+                _col_config[col] = st.column_config.Column(width="small")
+            elif max_len <= 15:
+                _col_config[col] = st.column_config.Column(width="medium")
+            else:
+                _col_config[col] = st.column_config.Column(width="large")
 
-    # Store updated visibility
-    st.session_state.series_visibility[vis_key] = updated_visibility
-
-    # Update button
-    if visible_count == 0:
-        st.error(t("at_least_one_series"))
-    elif st.button(t("update_visibility"), type="primary", use_container_width=True):
-        with st.spinner(t("rendering")):
-            try:
-                edited_df = get_chart_df(selected_chart)
-                updated_bytes = update_chart_data(
-                    st.session_state.pptx_bytes,
-                    selected_chart.slide_index,
-                    selected_chart.shape_name,
-                    edited_df,
-                    selected_chart.is_xy,
-                    selected_chart.series_formats,
-                    updated_visibility,
-                )
-                st.success(t("visibility_updated"))
-                _commit_update(updated_bytes)
-            except Exception as e:
-                st.error(f"{t('error_render')}: {e}")
-
-# --- CSV IMPORT/EXPORT ---
-with tab_csv:
-    st.subheader(t("tab_csv"))
-
-    col_export, col_import = st.columns(2, gap="large")
-
-    with col_export:
-        st.markdown(f"**{t('export_title')}**")
-        st.caption(t("chart_info", name=selected_chart.shape_name, slide=selected_chart.slide_index + 1))
-
-        export_df = get_chart_df(selected_chart)
-        csv_buffer = io.StringIO()
-        export_df.to_csv(csv_buffer, index=False, encoding="utf-8")
-        csv_bytes = ("\ufeff" + csv_buffer.getvalue()).encode("utf-8")
-
-        st.download_button(
-            label=t("export_button"),
-            data=csv_bytes,
-            file_name=f"{selected_chart.shape_name}_slide{selected_chart.slide_index + 1}.csv",
-            mime="text/csv",
+        editor_key = f"editor_{selected_chart.slide_index}_{selected_chart.shape_name}"
+        edited_df = st.data_editor(
+            _edit_df,
+            num_rows="dynamic",
             use_container_width=True,
+            column_config=_col_config,
+            key=editor_key,
+            height=300,
         )
 
-    with col_import:
-        st.markdown(f"**{t('import_title')}**")
-        st.caption(t("import_info"))
+        # Push to undo stack if data changed
+        prev_df = st.session_state.edited_data.get(chart_key)
+        if prev_df is not None and not edited_df.equals(prev_df):
+            st.session_state.setdefault("undo_stack", []).append((chart_key, prev_df.copy()))
+        st.session_state.edited_data[chart_key] = edited_df
 
-        csv_file = st.file_uploader(
-            t("import_upload_label"),
-            type=["csv"],
-            key=f"csv_import_{selected_chart.slide_index}_{selected_chart.shape_name}",
-        )
+        has_unsaved = not edited_df.equals(selected_chart.dataframe)
+        if has_unsaved:
+            st.warning(t("unsaved_warning"))
 
-        if csv_file is not None:
-            try:
-                imported_df = pd.read_csv(csv_file, encoding="utf-8-sig")
+        # Action buttons
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            undo_stack = st.session_state.get("undo_stack", [])
+            if st.button(t("undo"), use_container_width=True, disabled=len(undo_stack) == 0):
+                if undo_stack:
+                    undo_key, undo_df = undo_stack.pop()
+                    st.session_state.edited_data[undo_key] = undo_df
+                    st.success(t("undo_success"))
+                    st.rerun()
+        with c2:
+            if st.button(t("save_to_pptx"), type="primary", use_container_width=True,
+                         disabled=not has_unsaved,
+                         help=None if has_unsaved else t("save_disabled_hint")):
+                with st.spinner(t("saving_to_pptx")):
+                    try:
+                        updated_bytes = update_chart_data(
+                            st.session_state.pptx_bytes,
+                            selected_chart.slide_index,
+                            selected_chart.shape_name,
+                            edited_df,
+                            selected_chart.is_xy,
+                            selected_chart.series_formats,
+                            current_vis,
+                        )
+                        st.session_state.pptx_bytes = updated_bytes
+                        st.session_state.charts_cache = None
+                        st.session_state.edited_data.pop(chart_key, None)
+                        _schedule_auto_download()
+                        st.success(t("saved_to_pptx"))
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"{t('error_render')}: {e}")
+        with c3:
+            st.download_button(
+                label=t("download"),
+                data=st.session_state.pptx_bytes,
+                file_name=f"updated_{st.session_state.file_name}",
+                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                use_container_width=True,
+            )
 
-                expected_cols = len(selected_chart.dataframe.columns)
-                if len(imported_df.columns) != expected_cols:
-                    st.error(t("column_mismatch", expected=expected_cols, found=len(imported_df.columns)))
-                else:
-                    imported_df.columns = selected_chart.dataframe.columns
+    # --- SELECT DATA TAB (Series Visibility) ---
+    with tab_select_data:
+        st.subheader(t("tab_select_data"))
+        st.caption(t("select_data_caption"))
 
-                    st.markdown(f"**{t('preview_heading')}**")
-                    st.dataframe(imported_df, use_container_width=True)
+        vis_key = (selected_chart.slide_index, selected_chart.shape_name)
+        if "series_visibility" not in st.session_state:
+            st.session_state.series_visibility = {}
+        if vis_key not in st.session_state.series_visibility:
+            st.session_state.series_visibility[vis_key] = dict(selected_chart.series_visibility)
 
-                    if st.button(t("apply_imported"), type="primary", use_container_width=True):
-                        chart_key = (selected_chart.slide_index, selected_chart.shape_name)
-                        st.session_state.edited_data[chart_key] = imported_df
+        current_visibility = st.session_state.series_visibility[vis_key]
 
-                        with st.spinner(t("rendering")):
-                            csv_vis = st.session_state.get("series_visibility", {}).get(
-                                chart_key, selected_chart.series_visibility
-                            )
-                            updated_bytes = update_chart_data(
-                                st.session_state.pptx_bytes,
-                                selected_chart.slide_index,
-                                selected_chart.shape_name,
-                                imported_df,
-                                selected_chart.is_xy,
-                                selected_chart.series_formats,
-                                csv_vis,
-                            )
-                            st.success(t("import_success"))
-                            _commit_update(updated_bytes)
-            except Exception as e:
-                st.error(t("file_read_error", e=e))
+        if selected_chart.is_xy:
+            series_display_names = selected_chart.series_names
+        else:
+            series_display_names = list(selected_chart.series_visibility.keys())
 
+        st.markdown(f"**{t('series_visible_label')}**")
+        updated_visibility = {}
+        for name in series_display_names:
+            visible = current_visibility.get(name, True)
+            updated_visibility[name] = st.checkbox(
+                name,
+                value=visible,
+                key=f"vis_{selected_chart.slide_index}_{selected_chart.shape_name}_{name}",
+            )
+
+        visible_count = sum(1 for v in updated_visibility.values() if v)
+        hidden_count = len(updated_visibility) - visible_count
+
+        if hidden_count > 0:
+            st.info(t("hidden_series_count", count=hidden_count))
+        else:
+            st.success(t("all_series_visible"))
+
+        st.session_state.series_visibility[vis_key] = updated_visibility
+
+        if visible_count == 0:
+            st.error(t("at_least_one_series"))
+        elif st.button(t("update_visibility"), type="primary", use_container_width=True):
+            with st.spinner(t("rendering")):
+                try:
+                    edited_df = get_chart_df(selected_chart)
+                    updated_bytes = update_chart_data(
+                        st.session_state.pptx_bytes,
+                        selected_chart.slide_index,
+                        selected_chart.shape_name,
+                        edited_df,
+                        selected_chart.is_xy,
+                        selected_chart.series_formats,
+                        updated_visibility,
+                    )
+                    st.success(t("visibility_updated"))
+                    _commit_update(updated_bytes)
+                except Exception as e:
+                    st.error(f"{t('error_render')}: {e}")
+
+    # --- CSV IMPORT/EXPORT TAB ---
+    with tab_csv:
+        st.subheader(t("tab_csv"))
+        st.caption(t("csv_help"))
+
+        col_export, col_import = st.columns(2, gap="large")
+
+        with col_export:
+            st.markdown(f"**{t('export_title')}**")
+            st.caption(t("chart_info", name=selected_chart.shape_name, slide=selected_chart.slide_index + 1))
+
+            export_df = get_chart_df(selected_chart)
+            csv_buffer = io.StringIO()
+            export_df.to_csv(csv_buffer, index=False, encoding="utf-8")
+            csv_bytes = ("\ufeff" + csv_buffer.getvalue()).encode("utf-8")
+
+            st.download_button(
+                label=t("export_button"),
+                data=csv_bytes,
+                file_name=f"{selected_chart.shape_name}_slide{selected_chart.slide_index + 1}.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
+
+        with col_import:
+            st.markdown(f"**{t('import_title')}**")
+            st.caption(t("import_info"))
+
+            csv_file = st.file_uploader(
+                t("import_upload_label"),
+                type=["csv"],
+                key=f"csv_import_{selected_chart.slide_index}_{selected_chart.shape_name}",
+            )
+
+            if csv_file is not None:
+                try:
+                    imported_df = pd.read_csv(csv_file, encoding="utf-8-sig")
+
+                    expected_cols = len(selected_chart.dataframe.columns)
+                    if len(imported_df.columns) != expected_cols:
+                        st.error(t("column_mismatch", expected=expected_cols, found=len(imported_df.columns)))
+                    else:
+                        imported_df.columns = selected_chart.dataframe.columns
+
+                        st.markdown(f"**{t('preview_heading')}**")
+                        st.dataframe(imported_df, use_container_width=True)
+
+                        if st.button(t("apply_imported"), type="primary", use_container_width=True):
+                            st.session_state.edited_data[chart_key] = imported_df
+
+                            with st.spinner(t("applying_csv")):
+                                csv_vis = st.session_state.get("series_visibility", {}).get(
+                                    chart_key, selected_chart.series_visibility
+                                )
+                                updated_bytes = update_chart_data(
+                                    st.session_state.pptx_bytes,
+                                    selected_chart.slide_index,
+                                    selected_chart.shape_name,
+                                    imported_df,
+                                    selected_chart.is_xy,
+                                    selected_chart.series_formats,
+                                    csv_vis,
+                                )
+                                st.success(t("import_success"))
+                                _commit_update(updated_bytes)
+                except Exception as e:
+                    st.error(t("file_read_error", e=e))
+
+    # --- BATCH ADD ROW TAB ---
+    with tab_batch:
+        st.subheader(t("tab_batch"))
+        st.caption(t("batch_caption"))
+
+        new_category = st.text_input(t("new_category_label"), key="batch_category")
+
+        if new_category:
+            st.markdown(f"**{t('batch_preview', name=new_category, count=len(charts))}**")
+
+            if st.button(t("batch_button"), type="primary", use_container_width=True):
+                with st.spinner(t("batch_spinner")):
+                    try:
+                        updates = []
+                        for chart_info in charts:
+                            df = get_chart_df(chart_info)
+
+                            new_row = {df.columns[0]: new_category}
+                            for col in df.columns[1:]:
+                                new_row[col] = None
+                            df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+
+                            chart_key_batch = (chart_info.slide_index, chart_info.shape_name)
+                            st.session_state.edited_data[chart_key_batch] = df
+                            updates.append((
+                                chart_info.slide_index,
+                                chart_info.shape_name,
+                                df,
+                                chart_info.is_xy,
+                                chart_info.series_formats,
+                            ))
+
+                        updated_bytes = update_multiple_charts(
+                            st.session_state.pptx_bytes, updates,
+                        )
+                        st.success(t("batch_success", name=new_category, count=len(charts)))
+                        _commit_update(updated_bytes)
+                    except Exception as e:
+                        st.error(t("error_generic", e=e))
