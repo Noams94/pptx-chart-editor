@@ -404,6 +404,37 @@ def show_progress_indicator(current_step: int, total_steps: int = 3):
     st.markdown(html, unsafe_allow_html=True)
 
 
+def render_user_guide():
+    """Render the bilingual user guide content."""
+    st.markdown(f"### {t('guide_overview_title')}")
+    st.markdown(t("guide_overview_body"))
+
+    st.markdown(f"### {t('guide_start_title')}")
+    st.markdown(f"1. {t('guide_start_1')}")
+    st.markdown(f"2. {t('guide_start_2')}")
+    st.markdown(f"3. {t('guide_start_3')}")
+    st.markdown(f"4. {t('guide_start_4')}")
+    st.markdown(f"5. {t('guide_start_5')}")
+
+    st.markdown(f"### {t('guide_edit_title')}")
+    st.markdown(t("guide_edit_body"))
+
+    st.markdown(f"### {t('guide_excel_title')}")
+    st.markdown(t("guide_excel_body"))
+
+    st.markdown(f"### {t('guide_csv_title')}")
+    st.markdown(t("guide_csv_body"))
+
+    st.markdown(f"### {t('guide_batch_title')}")
+    st.markdown(t("guide_batch_body"))
+
+    st.markdown(f"### {t('guide_visibility_title')}")
+    st.markdown(t("guide_visibility_body"))
+
+    st.markdown(f"### {t('guide_tips_title')}")
+    st.markdown(t("guide_tips_body"))
+
+
 def show_interactive_wizard():
     """Display the interactive Getting Started wizard with clickable steps.
 
@@ -535,6 +566,8 @@ with st.sidebar:
     # Show "Quick Start" title only on landing screen (no file uploaded yet)
     if "pptx_bytes" not in st.session_state:
         st.markdown(f"### ⚡ {t('quick_start')}")
+        with st.expander(f"📖 {t('tab_guide')}"):
+            render_user_guide()
 
     st.header(f"📁 {t('upload_section_title')}")
     uploaded_file = st.file_uploader(
@@ -552,6 +585,10 @@ with st.sidebar:
             value=st.session_state.auto_save,
             help=t("auto_save_info"),
         )
+
+        # User Guide expander
+        with st.expander(f"📖 {t('tab_guide')}"):
+            render_user_guide()
 
         # Only show SLIDES section in step 3
         if st.session_state.get("show_step3", False):
