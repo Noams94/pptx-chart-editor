@@ -191,18 +191,19 @@ TRANSLATIONS = {
         "guide_overview_body": "עורך הגרפים מאפשר לערוך נתוני גרפים בתוך מצגות PowerPoint ישירות בדפדפן. העלו קובץ .pptx, שנו ערכים בטבלה אינטראקטיבית עם תצוגה מקדימה חיה, והורידו את המצגת המעודכנת — ללא צורך ב-PowerPoint.",
         "guide_start_title": "איך מתחילים?",
         "guide_start_1": "**העלאה** — גררו קובץ .pptx לאזור ההעלאה בסרגל הצדי, או לחצו לבחירת קובץ",
-        "guide_start_2": "**בחירת שקף** — לחצו על תמונה ממוזערת של שקף בסרגל הצדי",
-        "guide_start_3": "**בחירת גרף** — בחרו גרף מהתפריט הנפתח",
+        "guide_start_2": "**עריכה מרוכזת (אופציונלי)** — ייצאו את כל הגרפים ל-Excel, ערכו, וייבאו בחזרה",
+        "guide_start_3": "**בחירת שקף** — לחצו על שקף בסרגל הצדי לעריכת גרף בודד",
         "guide_start_4": "**עריכת נתונים** — שנו ערכים בטבלה; התצוגה המקדימה מתעדכנת מיידית",
         "guide_start_5": "**שמירה** — לחצו \"שמור במצגת\" ולאחר מכן הורידו את הקובץ המעודכן",
         "guide_edit_title": "עריכת גרף",
         "guide_edit_body": """- טבלת הנתונים מציגה קטגוריות (שורות) וסדרות (עמודות)
 - ערכו כל תא — תצוגת הגרף מתעדכנת בזמן אמת
-- השתמשו בלחצן **לפני/אחרי** להשוואה עם הגרף המקורי
+- השתמשו בלחצן **לפני/אחרי** להשוואה עם הגרף או השקף המקורי
 - לחצו **שמור במצגת** כדי לכתוב את השינויים בחזרה לקובץ
-- השתמשו ב**ביטול** כדי לחזור לשינוי האחרון""",
+- השתמשו ב**ביטול** כדי לחזור לשינוי האחרון (רמה אחת)
+- לחצו **רנדר תצוגה מקדימה** ליצירת תמונות שקפים (אופציונלי — ניתן לערוך גם בלי רנדור)""",
         "guide_excel_title": "עריכה מרוכזת עם Excel",
-        "guide_excel_body": """- עברו ללשונית **ייבוא/ייצוא Excel**
+        "guide_excel_body": """- אחרי העלאת קובץ, מוצג מסך **עריכת כל הגרפים** עם אפשרויות Excel
 - לחצו **ייצא הכל ל-Excel** — מוריד קובץ .xlsx עם לשונית לכל גרף
 - ערכו את קובץ ה-Excel בכל תוכנת גיליונות
 - העלו את הקובץ המעודכן — האפליקציה מתאימה לשוניות לגרפים אוטומטית
@@ -405,18 +406,19 @@ TRANSLATIONS = {
         "guide_overview_body": "PPTX Chart Editor lets you edit chart data inside PowerPoint presentations directly in your browser. Upload a .pptx file, modify chart values in an interactive table with a live preview, and download the updated presentation — no PowerPoint required.",
         "guide_start_title": "Getting Started",
         "guide_start_1": "**Upload** — Drag a .pptx file into the upload area in the sidebar, or click to browse",
-        "guide_start_2": "**Select a slide** — Click a slide thumbnail in the sidebar to see its charts",
-        "guide_start_3": "**Choose a chart** — Pick a chart from the dropdown to start editing",
+        "guide_start_2": "**Bulk edit (optional)** — Export all charts to Excel, edit, and import back",
+        "guide_start_3": "**Select a slide** — Click a slide in the sidebar to edit a specific chart",
         "guide_start_4": "**Edit data** — Modify values in the table; the chart preview updates instantly",
         "guide_start_5": "**Save** — Click \"Save to Presentation\" then download the updated file",
         "guide_edit_title": "Editing a Chart",
         "guide_edit_body": """- The data table shows categories (rows) and series (columns)
 - Edit any cell — the Plotly chart preview updates in real time
-- Use the **Before/After** toggle to compare your changes with the original
+- Use the **Before/After** toggle to compare your changes with the original chart or slide
 - Click **Save to Presentation** to write changes back to the .pptx file
-- Use **Undo** to revert the last change""",
+- Use **Undo** to revert the last change (single level)
+- Click **Render Preview** to generate slide images (optional — you can edit without rendering)""",
         "guide_excel_title": "Bulk Editing with Excel",
-        "guide_excel_body": """- Go to the **Excel Import/Export** tab
+        "guide_excel_body": """- After uploading a file, the **Edit All Charts** screen shows Excel options
 - Click **Export All to Excel** — downloads a .xlsx with one sheet per chart
 - Edit the Excel file in any spreadsheet app
 - Upload the modified .xlsx — the app matches sheets to charts automatically
