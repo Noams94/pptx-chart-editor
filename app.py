@@ -1294,3 +1294,4 @@ with col_editor:
                         _commit_update(updated_bytes)
                     except Exception as e:
                         st.error(t("error_generic", e=e))
+
