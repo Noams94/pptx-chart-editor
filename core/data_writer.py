@@ -10,7 +10,7 @@ from pptx.chart.data import CategoryChartData, XyChartData
 from pptx.oxml.ns import qn
 from lxml import etree
 
-from core.data_extractor import is_percentage_format
+from core.data_extractor import is_percentage_format, _iter_chart_shapes
 
 
 def _display_to_raw(df: pd.DataFrame, series_formats: dict) -> pd.DataFrame:
@@ -59,10 +59,10 @@ def update_chart_data(
     prs = Presentation(BytesIO(pptx_bytes))
     slide = prs.slides[slide_index]
 
-    # Find the chart shape
+    # Find the chart shape (including inside group shapes)
     chart_shape = None
-    for shape in slide.shapes:
-        if shape.has_chart and shape.name == shape_name:
+    for shape in _iter_chart_shapes(slide.shapes):
+        if shape.name == shape_name:
             chart_shape = shape
             break
 
@@ -130,8 +130,8 @@ def update_multiple_charts(
         slide = prs.slides[slide_index]
 
         chart_shape = None
-        for shape in slide.shapes:
-            if shape.has_chart and shape.name == shape_name:
+        for shape in _iter_chart_shapes(slide.shapes):
+            if shape.name == shape_name:
                 chart_shape = shape
                 break
         if chart_shape is None:
