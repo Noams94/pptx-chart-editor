@@ -428,6 +428,9 @@ def render_user_guide():
     st.markdown(f"### {t('guide_batch_title')}")
     st.markdown(t("guide_batch_body"))
 
+    st.markdown(f"### {t('guide_batch_col_title')}")
+    st.markdown(t("guide_batch_col_body"))
+
     st.markdown(f"### {t('guide_visibility_title')}")
     st.markdown(t("guide_visibility_body"))
 
@@ -870,6 +873,54 @@ if not st.session_state.get("show_step3", False):
                 except Exception as e:
                     st.error(t("error_generic", e=e))
 
+    # --- BATCH ADD COLUMN (all charts) ---
+    st.divider()
+    st.subheader(f"➕ {t('tab_batch_col')}")
+    st.caption(t("batch_col_caption"))
+
+    new_series = st.text_input(t("new_series_label"), key="batch_series_step2")
+
+    if new_series:
+        # Warn if column already exists in some charts
+        conflicts = [ci for ci in charts if new_series in get_chart_df(ci).columns]
+        if conflicts:
+            st.warning(t("batch_col_exists_warning", name=new_series, count=len(conflicts)))
+
+        st.markdown(f"**{t('batch_col_preview', name=new_series, count=len(charts))}**")
+
+        if st.button(t("batch_col_button"), type="primary", use_container_width=True, key="batch_col_btn_step2"):
+            with st.spinner(t("batch_col_spinner")):
+                try:
+                    updates = []
+                    for chart_info in charts:
+                        df = get_chart_df(chart_info)
+                        df[new_series] = None
+                        st.session_state.edited_data[chart_info.key] = df
+
+                        # Inherit format from last existing series
+                        updated_formats = dict(chart_info.series_formats)
+                        last_format = list(updated_formats.values())[-1] if updated_formats else "General"
+                        updated_formats[new_series] = last_format
+
+                        # New column visible by default
+                        updated_visibility = dict(chart_info.series_visibility)
+                        updated_visibility[new_series] = True
+
+                        updates.append((
+                            chart_info.slide_index,
+                            chart_info.shape_name,
+                            df,
+                            chart_info.is_xy,
+                            updated_formats,
+                            updated_visibility,
+                            chart_info.shape_id,
+                        ))
+                    updated_bytes = update_multiple_charts(st.session_state.pptx_bytes, updates)
+                    st.success(t("batch_col_success", name=new_series, count=len(charts)))
+                    _commit_update(updated_bytes)
+                except Exception as e:
+                    st.error(t("error_generic", e=e))
+
     # --- Navigation buttons ---
     st.divider()
     col_back, _, col_next = st.columns([1, 2, 1])
@@ -1081,7 +1132,7 @@ with col_preview:
 with col_editor:
     st.markdown(f"### 📝 {t('editor_section_title')}")
 
-    tab_edit, tab_select_data, tab_csv, tab_batch = st.tabs([t("tab_edit"), t("tab_select_data"), t("tab_csv"), t("tab_batch")])
+    tab_edit, tab_select_data, tab_csv, tab_batch, tab_batch_col = st.tabs([t("tab_edit"), t("tab_select_data"), t("tab_csv"), t("tab_batch"), t("tab_batch_col")])
 
     # --- EDIT CHART TAB ---
     with tab_edit:
@@ -1337,6 +1388,57 @@ with col_editor:
                             st.session_state.pptx_bytes, updates,
                         )
                         st.success(t("batch_success", name=new_category, count=len(charts)))
+                        _commit_update(updated_bytes)
+                    except Exception as e:
+                        st.error(t("error_generic", e=e))
+
+    # --- BATCH ADD COLUMN TAB ---
+    with tab_batch_col:
+        st.subheader(t("tab_batch_col"))
+        st.caption(t("batch_col_caption"))
+
+        new_series = st.text_input(t("new_series_label"), key="batch_series")
+
+        if new_series:
+            # Warn if column already exists in some charts
+            conflicts = [ci for ci in charts if new_series in get_chart_df(ci).columns]
+            if conflicts:
+                st.warning(t("batch_col_exists_warning", name=new_series, count=len(conflicts)))
+
+            st.markdown(f"**{t('batch_col_preview', name=new_series, count=len(charts))}**")
+
+            if st.button(t("batch_col_button"), type="primary", use_container_width=True):
+                with st.spinner(t("batch_col_spinner")):
+                    try:
+                        updates = []
+                        for chart_info in charts:
+                            df = get_chart_df(chart_info)
+                            df[new_series] = None
+                            st.session_state.edited_data[chart_info.key] = df
+
+                            # Inherit format from last existing series
+                            updated_formats = dict(chart_info.series_formats)
+                            last_format = list(updated_formats.values())[-1] if updated_formats else "General"
+                            updated_formats[new_series] = last_format
+
+                            # New column visible by default
+                            updated_visibility = dict(chart_info.series_visibility)
+                            updated_visibility[new_series] = True
+
+                            updates.append((
+                                chart_info.slide_index,
+                                chart_info.shape_name,
+                                df,
+                                chart_info.is_xy,
+                                updated_formats,
+                                updated_visibility,
+                                chart_info.shape_id,
+                            ))
+
+                        updated_bytes = update_multiple_charts(
+                            st.session_state.pptx_bytes, updates,
+                        )
+                        st.success(t("batch_col_success", name=new_series, count=len(charts)))
                         _commit_update(updated_bytes)
                     except Exception as e:
                         st.error(t("error_generic", e=e))

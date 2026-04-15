@@ -56,6 +56,15 @@ TRANSLATIONS = {
         "batch_button": "הוסף שורה לכל הגרפים",
         "batch_spinner": "מוסיף שורה ומעדכן...",
         "batch_success": "שורה '{name}' נוספה ל-{count} גרפים",
+        # Batch add column tab
+        "tab_batch_col": "הוספת עמודה לכל הגרפים",
+        "batch_col_caption": "הוסף סדרה חדשה (למשל תאריך סקר) לכל הגרפים במצגת בבת אחת",
+        "new_series_label": "שם הסדרה החדשה (למשל: 15.6.26)",
+        "batch_col_preview": "ייתווסף עמודה חדשה '{name}' ל-{count} גרפים",
+        "batch_col_button": "הוסף עמודה לכל הגרפים",
+        "batch_col_spinner": "מוסיף עמודה ומעדכן...",
+        "batch_col_success": "עמודה '{name}' נוספה ל-{count} גרפים",
+        "batch_col_exists_warning": "עמודה '{name}' כבר קיימת ב-{count} גרפים ותידרס",
         "error_generic": "שגיאה: {e}",
         # CSV tab
         "export_title": "ייצוא נתוני הגרף הנוכחי",
@@ -213,6 +222,9 @@ TRANSLATIONS = {
         "guide_batch_title": "הוספת שורה לכל הגרפים",
         "guide_batch_body": """- בלשונית **הוספת שורה**, הקלידו שם קטגוריה חדשה (למשל תאריך סקר)
 - לחצו **הוסף שורה לכל הגרפים** כדי להוסיף אותה שורה לכל הגרפים בבת אחת""",
+        "guide_batch_col_title": "הוספת עמודה לכל הגרפים",
+        "guide_batch_col_body": """- בלשונית **הוספת עמודה**, הקלידו שם סדרה חדשה (למשל תאריך סקר)
+- לחצו **הוסף עמודה לכל הגרפים** כדי להוסיף אותה עמודה לכל הגרפים בבת אחת""",
         "guide_visibility_title": "בחירת נתונים (נראות סדרות)",
         "guide_visibility_body": """- בלשונית **בחירת נתונים**, בחרו אילו סדרות יוצגו בגרף
 - סדרות מוסתרות שומרות על הנתונים שלהן אבל לא מוצגות
@@ -270,6 +282,15 @@ TRANSLATIONS = {
         "batch_button": "Add Row to All Charts",
         "batch_spinner": "Adding row and updating...",
         "batch_success": "Row '{name}' added to {count} charts",
+        # Batch add column tab
+        "tab_batch_col": "Add Column to All Charts",
+        "batch_col_caption": "Add a new series (e.g. poll date) to all charts in the presentation at once",
+        "new_series_label": "New series/column name (e.g.: 15.6.26)",
+        "batch_col_preview": "A new column '{name}' will be added to {count} charts",
+        "batch_col_button": "Add Column to All Charts",
+        "batch_col_spinner": "Adding column and updating...",
+        "batch_col_success": "Column '{name}' added to {count} charts",
+        "batch_col_exists_warning": "Column '{name}' already exists in {count} chart(s) and will be overwritten",
         "error_generic": "Error: {e}",
         # CSV tab
         "export_title": "Export Current Chart Data",
@@ -427,6 +448,9 @@ TRANSLATIONS = {
         "guide_batch_title": "Add Row to All Charts",
         "guide_batch_body": """- In the **Batch** tab, enter a new category name (e.g., a survey date)
 - Click **Add Row to All Charts** to add the same row to every chart at once""",
+        "guide_batch_col_title": "Add Column to All Charts",
+        "guide_batch_col_body": """- In the **Add Column** tab, enter a new series/column name (e.g., a poll date)
+- Click **Add Column to All Charts** to add the same column to every chart at once""",
         "guide_visibility_title": "Series Visibility",
         "guide_visibility_body": """- In the **Select Data** tab, toggle which series are shown on the chart
 - Hidden series keep their data but are not plotted
