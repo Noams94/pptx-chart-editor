@@ -981,10 +981,15 @@ with col_preview:
 
     # Chart Selection
     st.markdown(f"#### {t('select_chart')}")
-    chart_options = {
-        f"{c.chart_title or c.shape_name} ({c.chart_type_name})": i
-        for i, c in enumerate(slide_charts)
-    }
+    chart_labels = []
+    seen_labels = {}
+    for i, c in enumerate(slide_charts):
+        label = f"{c.chart_title or c.shape_name} ({c.chart_type_name})"
+        seen_labels[label] = seen_labels.get(label, 0) + 1
+        if seen_labels[label] > 1:
+            label = f"{label} #{seen_labels[label]}"
+        chart_labels.append(label)
+    chart_options = {label: i for i, label in enumerate(chart_labels)}
 
     if not chart_options:
         st.info(t("no_charts_in_slide"))
