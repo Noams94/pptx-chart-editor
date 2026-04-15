@@ -321,7 +321,7 @@ st.markdown("""
 
 def get_chart_df(chart_info):
     """Get current DataFrame for a chart (edited version if exists, otherwise original)."""
-    key = (chart_info.slide_index, chart_info.shape_name)
+    key = chart_info.key
     if key in st.session_state.edited_data:
         return st.session_state.edited_data[key].copy()
     return chart_info.dataframe.copy()
@@ -360,7 +360,7 @@ def _build_sheet_name_map(charts_list) -> dict:
             sheet = base[:29] + f"_{counter}"
             counter += 1
         seen.add(sheet)
-        name_map[(ci.slide_index, ci.shape_name)] = sheet
+        name_map[ci.key] = sheet
     return name_map
 
 
@@ -652,7 +652,7 @@ if st.session_state.get("charts_cache") is None:
         st.session_state.charts_cache = extract_all_charts(st.session_state.pptx_bytes)
         if st.session_state.original_charts is None:
             st.session_state.original_charts = {
-                (c.slide_index, c.shape_name): c.dataframe.copy()
+                c.key: c.dataframe.copy()
                 for c in st.session_state.charts_cache
             }
 
@@ -736,7 +736,7 @@ if not st.session_state.get("show_step3", False):
             xl_buffer = io.BytesIO()
             with pd.ExcelWriter(xl_buffer, engine="openpyxl") as writer:
                 for chart_info in charts:
-                    sheet = sheet_name_map[(chart_info.slide_index, chart_info.shape_name)]
+                    sheet = sheet_name_map[chart_info.key]
                     get_chart_df(chart_info).to_excel(writer, sheet_name=sheet, index=False)
             st.session_state.xl_export_bytes = xl_buffer.getvalue()
             st.session_state.xl_export_fingerprint = edit_fingerprint
@@ -770,7 +770,7 @@ if not st.session_state.get("show_step3", False):
                 xls = pd.ExcelFile(xl_file, engine="openpyxl")
 
                 sheet_to_chart = {v: k for k, v in sheet_name_map.items()}
-                charts_by_key = {(ci.slide_index, ci.shape_name): ci for ci in charts}
+                charts_by_key = {ci.key: ci for ci in charts}
 
                 changed = []
                 unchanged = 0
@@ -818,14 +818,15 @@ if not st.session_state.get("show_step3", False):
                     with st.spinner(t("excel_apply_spinner", count=len(changed))):
                         updates = []
                         for ci, df in changed:
-                            chart_key = (ci.slide_index, ci.shape_name)
-                            st.session_state.edited_data[chart_key] = df
+                            st.session_state.edited_data[ci.key] = df
                             updates.append((
                                 ci.slide_index,
                                 ci.shape_name,
                                 df,
                                 ci.is_xy,
                                 ci.series_formats,
+                                None,
+                                ci.shape_id,
                             ))
                         updated_bytes = update_multiple_charts(
                             st.session_state.pptx_bytes, updates,
@@ -861,9 +862,8 @@ if not st.session_state.get("show_step3", False):
                         for col in df.columns[1:]:
                             new_row[col] = None
                         df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-                        ck = (chart_info.slide_index, chart_info.shape_name)
-                        st.session_state.edited_data[ck] = df
-                        updates.append((chart_info.slide_index, chart_info.shape_name, df, chart_info.is_xy, chart_info.series_formats))
+                        st.session_state.edited_data[chart_info.key] = df
+                        updates.append((chart_info.slide_index, chart_info.shape_name, df, chart_info.is_xy, chart_info.series_formats, None, chart_info.shape_id))
                     updated_bytes = update_multiple_charts(st.session_state.pptx_bytes, updates)
                     st.success(t("batch_success", name=new_category, count=len(charts)))
                     _commit_update(updated_bytes)
@@ -998,7 +998,7 @@ with col_preview:
     selected_idx = chart_options[selected_label]
     selected_chart = slide_charts[selected_idx]
 
-    chart_key = (selected_chart.slide_index, selected_chart.shape_name)
+    chart_key = selected_chart.key
     current_df = get_chart_df(selected_chart)
     current_vis = st.session_state.get("series_visibility", {}).get(
         chart_key, selected_chart.series_visibility
@@ -1104,7 +1104,7 @@ with col_editor:
             else:
                 _col_config[col] = st.column_config.Column(width="large")
 
-        editor_key = f"editor_{selected_chart.slide_index}_{selected_chart.shape_name}"
+        editor_key = f"editor_{selected_chart.slide_index}_{selected_chart.shape_id}"
         edited_df = st.data_editor(
             _edit_df,
             num_rows="dynamic",
@@ -1148,6 +1148,7 @@ with col_editor:
                             selected_chart.is_xy,
                             selected_chart.series_formats,
                             current_vis,
+                            selected_chart.shape_id,
                         )
                         st.session_state.pptx_bytes = updated_bytes
                         st.session_state.charts_cache = None
@@ -1171,7 +1172,7 @@ with col_editor:
         st.subheader(t("tab_select_data"))
         st.caption(t("select_data_caption"))
 
-        vis_key = (selected_chart.slide_index, selected_chart.shape_name)
+        vis_key = selected_chart.key
         if "series_visibility" not in st.session_state:
             st.session_state.series_visibility = {}
         if vis_key not in st.session_state.series_visibility:
@@ -1191,7 +1192,7 @@ with col_editor:
             updated_visibility[name] = st.checkbox(
                 name,
                 value=visible,
-                key=f"vis_{selected_chart.slide_index}_{selected_chart.shape_name}_{name}",
+                key=f"vis_{selected_chart.slide_index}_{selected_chart.shape_id}_{name}",
             )
 
         visible_count = sum(1 for v in updated_visibility.values() if v)
@@ -1218,6 +1219,7 @@ with col_editor:
                         selected_chart.is_xy,
                         selected_chart.series_formats,
                         updated_visibility,
+                        selected_chart.shape_id,
                     )
                     st.success(t("visibility_updated"))
                     _commit_update(updated_bytes)
@@ -1255,7 +1257,7 @@ with col_editor:
             csv_file = st.file_uploader(
                 t("import_upload_label"),
                 type=["csv"],
-                key=f"csv_import_{selected_chart.slide_index}_{selected_chart.shape_name}",
+                key=f"csv_import_{selected_chart.slide_index}_{selected_chart.shape_id}",
             )
 
             if csv_file is not None:
@@ -1286,6 +1288,7 @@ with col_editor:
                                     selected_chart.is_xy,
                                     selected_chart.series_formats,
                                     csv_vis,
+                                    selected_chart.shape_id,
                                 )
                                 st.success(t("import_success"))
                                 _commit_update(updated_bytes)
@@ -1314,14 +1317,15 @@ with col_editor:
                                 new_row[col] = None
                             df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
 
-                            chart_key_batch = (chart_info.slide_index, chart_info.shape_name)
-                            st.session_state.edited_data[chart_key_batch] = df
+                            st.session_state.edited_data[chart_info.key] = df
                             updates.append((
                                 chart_info.slide_index,
                                 chart_info.shape_name,
                                 df,
                                 chart_info.is_xy,
                                 chart_info.series_formats,
+                                None,
+                                chart_info.shape_id,
                             ))
 
                         updated_bytes = update_multiple_charts(
