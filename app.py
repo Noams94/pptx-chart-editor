@@ -576,6 +576,8 @@ with st.sidebar:
         help=t("upload_help"),
         label_visibility="collapsed"
     )
+    if "pptx_bytes" in st.session_state:
+        st.warning(t("sidebar_upload_override_warning"))
 
     # Show sidebar controls if file is loaded (from sidebar OR wizard uploader)
     if uploaded_file or "pptx_bytes" in st.session_state:
