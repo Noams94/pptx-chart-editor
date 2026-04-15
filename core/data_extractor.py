@@ -12,7 +12,18 @@ from pptx.chart.chart import Chart
 from pptx.enum.chart import XL_CHART_TYPE
 from pptx.oxml.ns import qn
 
+from pptx.enum.shapes import MSO_SHAPE_TYPE
+
 from ui.rtl_support import t, chart_type_display_name
+
+
+def _iter_chart_shapes(shapes):
+    """Yield all chart-bearing shapes, recursing into group shapes."""
+    for shape in shapes:
+        if shape.has_chart:
+            yield shape
+        if shape.shape_type == MSO_SHAPE_TYPE.GROUP:
+            yield from _iter_chart_shapes(shape.shapes)
 
 
 # Chart types that use XyChartData (scatter plots)
@@ -161,10 +172,7 @@ def extract_all_charts(pptx_bytes: bytes) -> list[ChartInfo]:
     charts = []
 
     for slide_idx, slide in enumerate(prs.slides):
-        for shape in slide.shapes:
-            if not shape.has_chart:
-                continue
-
+        for shape in _iter_chart_shapes(slide.shapes):
             chart = shape.chart
             try:
                 display_df, is_xy, series_names, series_formats, series_visibility = _extract_chart_data(chart)
