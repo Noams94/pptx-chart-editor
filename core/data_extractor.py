@@ -97,6 +97,7 @@ def _extract_series_visibility(chart: Chart) -> dict[str, bool]:
 class ChartInfo:
     slide_index: int
     shape_name: str
+    shape_id: int  # unique within a slide, needed when shape_name is duplicated
     chart_type: int
     chart_type_name: str
     dataframe: pd.DataFrame          # Display values (67 for 67%)
@@ -105,6 +106,11 @@ class ChartInfo:
     series_formats: dict = field(default_factory=dict)  # series_name -> formatCode
     series_visibility: dict = field(default_factory=dict)  # series_name -> bool (visible)
     chart_title: str = ""            # Chart title from XML (if available)
+
+    @property
+    def key(self) -> tuple:
+        """Unique identifier for this chart: (slide_index, shape_name, shape_id)."""
+        return (self.slide_index, self.shape_name, self.shape_id)
 
 
 def _extract_chart_data(chart: Chart) -> tuple[pd.DataFrame, bool, list[str], dict, dict]:
@@ -183,6 +189,7 @@ def extract_all_charts(pptx_bytes: bytes) -> list[ChartInfo]:
                 info = ChartInfo(
                     slide_index=slide_idx,
                     shape_name=shape.name,
+                    shape_id=shape.shape_id,
                     chart_type=chart.chart_type,
                     chart_type_name=chart_type_display_name(chart.chart_type),
                     dataframe=display_df,
