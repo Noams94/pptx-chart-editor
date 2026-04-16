@@ -373,12 +373,21 @@ def _commit_update(updated_bytes: bytes):
     st.rerun()
 
 
+def _chart_display_name(ci, index: int) -> str:
+    """Return a clean display name for a chart, using title or a numbered fallback."""
+    name = ci.chart_title or ci.shape_name
+    # If the shape name looks like a raw internal ID, use a numbered label instead
+    if not ci.chart_title and (";" in name or name.startswith("Google Shape")):
+        name = f"{t('chart_label')} {index + 1}"
+    return name
+
+
 def _build_chart_labels(charts_list):
     """Build unique display labels for a list of charts."""
     labels = []
     seen = {}
-    for ci in charts_list:
-        label = f"{ci.chart_title or ci.shape_name} ({ci.chart_type_name})"
+    for i, ci in enumerate(charts_list):
+        label = f"{_chart_display_name(ci, i)} ({ci.chart_type_name})"
         seen[label] = seen.get(label, 0) + 1
         if seen[label] > 1:
             label = f"{label} #{seen[label]}"
@@ -1089,7 +1098,7 @@ with col_preview:
     chart_labels = []
     seen_labels = {}
     for i, c in enumerate(slide_charts):
-        label = f"{c.chart_title or c.shape_name} ({c.chart_type_name})"
+        label = f"{_chart_display_name(c, i)} ({c.chart_type_name})"
         seen_labels[label] = seen_labels.get(label, 0) + 1
         if seen_labels[label] > 1:
             label = f"{label} #{seen_labels[label]}"
@@ -1190,7 +1199,7 @@ with col_editor:
 
     # --- EDIT CHART TAB ---
     with tab_edit:
-        st.markdown(f"**{selected_chart.chart_title or selected_chart.shape_name}**")
+        st.markdown(f"**{_chart_display_name(selected_chart, selected_idx)}**")
         st.caption(f"{t('chart_type')}: {selected_chart.chart_type_name}")
 
         pct_cols = [

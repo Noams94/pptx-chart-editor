@@ -136,6 +136,7 @@ TRANSLATIONS = {
         # Data extractor
         "series_n": "סדרה {n}",
         "category": "קטגוריה",
+        "chart_label": "גרף",
         # Chart type names
         "chart_column_clustered": "עמודות מקובצות",
         "chart_column_stacked": "עמודות מוערמות",
@@ -369,6 +370,7 @@ TRANSLATIONS = {
         # Data extractor
         "series_n": "Series {n}",
         "category": "Category",
+        "chart_label": "Chart",
         # Chart type names
         "chart_column_clustered": "Clustered Columns",
         "chart_column_stacked": "Stacked Columns",
