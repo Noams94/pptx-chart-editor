@@ -9,11 +9,13 @@ batch row addition, Hebrew/English language switching.
 import base64
 from collections import defaultdict
 import io
+from io import BytesIO
 import re
 
 import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
+from pptx import Presentation
 
 from core.data_extractor import extract_all_charts, is_percentage_format
 from core.data_writer import update_chart_data, update_multiple_charts
@@ -711,9 +713,10 @@ if not st.session_state.get("show_step3", False):
     st.success(f"✅ {t('wizard_upload_done', name=st.session_state.file_name)}")
 
     # Overview metrics
+    total_slide_count = len(Presentation(BytesIO(st.session_state.pptx_bytes)).slides)
     overview_cols = st.columns(3)
     with overview_cols[0]:
-        st.metric(t("total_slides"), len(charts_by_slide))
+        st.metric(t("total_slides"), f"{len(charts_by_slide)} / {total_slide_count}")
     with overview_cols[1]:
         st.metric(t("total_charts"), len(charts))
     with overview_cols[2]:

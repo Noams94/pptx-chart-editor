@@ -166,7 +166,7 @@ TRANSLATIONS = {
         "series_visibility_help": "בחר אילו סדרות יוצגו בגרף. סדרות מוסתרות שומרות על הנתונים שלהן אבל לא מוצגות בגרף.",
         "csv_help": "ייצא את הנתונים הנוכחיים ל-CSV או ייבא נתונים מקובץ CSV",
         # Metrics
-        "total_slides": "סה\"כ שקפים",
+        "total_slides": "שקפים עם גרפים / סה\"כ",
         "total_charts": "סה\"כ גרפים",
         "chart_types": "סוגי גרפים",
         "overview": "סקירה כללית",
@@ -395,7 +395,7 @@ TRANSLATIONS = {
         "series_visibility_help": "Choose which series to display in the chart. Hidden series keep their data but are not plotted.",
         "csv_help": "Export current data to CSV or import data from a CSV file",
         # Metrics
-        "total_slides": "Total Slides",
+        "total_slides": "Slides with Charts / Total",
         "total_charts": "Total Charts",
         "chart_types": "Chart Types",
         "overview": "Overview",
