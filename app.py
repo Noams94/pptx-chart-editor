@@ -845,7 +845,27 @@ if not st.session_state.get("show_step3", False):
         except Exception as e:
             st.error(t("file_read_error", e=e))
 
-    # --- BATCH ADD ROW (all charts) ---
+    # --- BATCH CHART SELECTION ---
+    st.divider()
+    batch_chart_labels = []
+    seen = {}
+    for ci in charts:
+        label = f"{ci.chart_title or ci.shape_name} ({ci.chart_type_name})"
+        seen[label] = seen.get(label, 0) + 1
+        if seen[label] > 1:
+            label = f"{label} #{seen[label]}"
+        batch_chart_labels.append(label)
+
+    selected_labels = st.multiselect(
+        t("batch_select_charts"),
+        options=batch_chart_labels,
+        default=batch_chart_labels,
+        key="batch_chart_selection",
+    )
+    selected_indices = {i for i, lbl in enumerate(batch_chart_labels) if lbl in selected_labels}
+    selected_charts = [charts[i] for i in sorted(selected_indices)]
+
+    # --- BATCH ADD ROW ---
     st.divider()
     st.subheader(f"➕ {t('tab_batch')}")
     st.caption(t("batch_caption"))
@@ -853,27 +873,30 @@ if not st.session_state.get("show_step3", False):
     new_category = st.text_input(t("new_category_label"), key="batch_category")
 
     if new_category:
-        st.markdown(f"**{t('batch_preview', name=new_category, count=len(charts))}**")
+        if not selected_charts:
+            st.info(t("batch_no_charts_selected"))
+        else:
+            st.markdown(f"**{t('batch_preview', name=new_category, count=len(selected_charts))}**")
 
-        if st.button(t("batch_button"), type="primary", use_container_width=True, key="batch_btn_step2"):
-            with st.spinner(t("batch_spinner")):
-                try:
-                    updates = []
-                    for chart_info in charts:
-                        df = get_chart_df(chart_info)
-                        new_row = {df.columns[0]: new_category}
-                        for col in df.columns[1:]:
-                            new_row[col] = None
-                        df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-                        st.session_state.edited_data[chart_info.key] = df
-                        updates.append((chart_info.slide_index, chart_info.shape_name, df, chart_info.is_xy, chart_info.series_formats, None, chart_info.shape_id))
-                    updated_bytes = update_multiple_charts(st.session_state.pptx_bytes, updates)
-                    st.success(t("batch_success", name=new_category, count=len(charts)))
-                    _commit_update(updated_bytes)
-                except Exception as e:
-                    st.error(t("error_generic", e=e))
+            if st.button(t("batch_button"), type="primary", use_container_width=True, key="batch_btn_step2"):
+                with st.spinner(t("batch_spinner")):
+                    try:
+                        updates = []
+                        for chart_info in selected_charts:
+                            df = get_chart_df(chart_info)
+                            new_row = {df.columns[0]: new_category}
+                            for col in df.columns[1:]:
+                                new_row[col] = None
+                            df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+                            st.session_state.edited_data[chart_info.key] = df
+                            updates.append((chart_info.slide_index, chart_info.shape_name, df, chart_info.is_xy, chart_info.series_formats, None, chart_info.shape_id))
+                        updated_bytes = update_multiple_charts(st.session_state.pptx_bytes, updates)
+                        st.success(t("batch_success", name=new_category, count=len(selected_charts)))
+                        _commit_update(updated_bytes)
+                    except Exception as e:
+                        st.error(t("error_generic", e=e))
 
-    # --- BATCH ADD COLUMN (all charts) ---
+    # --- BATCH ADD COLUMN ---
     st.divider()
     st.subheader(f"➕ {t('tab_batch_col')}")
     st.caption(t("batch_col_caption"))
@@ -881,45 +904,48 @@ if not st.session_state.get("show_step3", False):
     new_series = st.text_input(t("new_series_label"), key="batch_series_step2")
 
     if new_series:
-        # Warn if column already exists in some charts
-        conflicts = [ci for ci in charts if new_series in get_chart_df(ci).columns]
-        if conflicts:
-            st.warning(t("batch_col_exists_warning", name=new_series, count=len(conflicts)))
+        if not selected_charts:
+            st.info(t("batch_no_charts_selected"))
+        else:
+            # Warn if column already exists in some charts
+            conflicts = [ci for ci in selected_charts if new_series in get_chart_df(ci).columns]
+            if conflicts:
+                st.warning(t("batch_col_exists_warning", name=new_series, count=len(conflicts)))
 
-        st.markdown(f"**{t('batch_col_preview', name=new_series, count=len(charts))}**")
+            st.markdown(f"**{t('batch_col_preview', name=new_series, count=len(selected_charts))}**")
 
-        if st.button(t("batch_col_button"), type="primary", use_container_width=True, key="batch_col_btn_step2"):
-            with st.spinner(t("batch_col_spinner")):
-                try:
-                    updates = []
-                    for chart_info in charts:
-                        df = get_chart_df(chart_info)
-                        df[new_series] = None
-                        st.session_state.edited_data[chart_info.key] = df
+            if st.button(t("batch_col_button"), type="primary", use_container_width=True, key="batch_col_btn_step2"):
+                with st.spinner(t("batch_col_spinner")):
+                    try:
+                        updates = []
+                        for chart_info in selected_charts:
+                            df = get_chart_df(chart_info)
+                            df[new_series] = None
+                            st.session_state.edited_data[chart_info.key] = df
 
-                        # Inherit format from last existing series
-                        updated_formats = dict(chart_info.series_formats)
-                        last_format = list(updated_formats.values())[-1] if updated_formats else "General"
-                        updated_formats[new_series] = last_format
+                            # Inherit format from last existing series
+                            updated_formats = dict(chart_info.series_formats)
+                            last_format = list(updated_formats.values())[-1] if updated_formats else "General"
+                            updated_formats[new_series] = last_format
 
-                        # New column visible by default
-                        updated_visibility = dict(chart_info.series_visibility)
-                        updated_visibility[new_series] = True
+                            # New column visible by default
+                            updated_visibility = dict(chart_info.series_visibility)
+                            updated_visibility[new_series] = True
 
-                        updates.append((
-                            chart_info.slide_index,
-                            chart_info.shape_name,
-                            df,
-                            chart_info.is_xy,
-                            updated_formats,
-                            updated_visibility,
-                            chart_info.shape_id,
-                        ))
-                    updated_bytes = update_multiple_charts(st.session_state.pptx_bytes, updates)
-                    st.success(t("batch_col_success", name=new_series, count=len(charts)))
-                    _commit_update(updated_bytes)
-                except Exception as e:
-                    st.error(t("error_generic", e=e))
+                            updates.append((
+                                chart_info.slide_index,
+                                chart_info.shape_name,
+                                df,
+                                chart_info.is_xy,
+                                updated_formats,
+                                updated_visibility,
+                                chart_info.shape_id,
+                            ))
+                        updated_bytes = update_multiple_charts(st.session_state.pptx_bytes, updates)
+                        st.success(t("batch_col_success", name=new_series, count=len(selected_charts)))
+                        _commit_update(updated_bytes)
+                    except Exception as e:
+                        st.error(t("error_generic", e=e))
 
     # --- Navigation buttons ---
     st.divider()

@@ -49,6 +49,9 @@ TRANSLATIONS = {
         "saving_to_pptx": "שומר במצגת ומרנדר...",
         "saved_to_pptx": "השינויים נשמרו במצגת בהצלחה",
         "pct_columns_info": "עמודות באחוזים: {cols} (הזן 67 עבור 67%)",
+        # Batch chart selection
+        "batch_select_charts": "בחר גרפים",
+        "batch_no_charts_selected": "לא נבחרו גרפים",
         # Batch tab
         "batch_caption": "הוסף קטגוריה חדשה (למשל תאריך סקר) לכל הגרפים במצגת בבת אחת",
         "new_category_label": "שם הקטגוריה החדשה (למשל: 19.3.26)",
@@ -275,6 +278,9 @@ TRANSLATIONS = {
         "saving_to_pptx": "Saving to presentation and rendering...",
         "saved_to_pptx": "Changes saved to presentation successfully",
         "pct_columns_info": "Percentage columns: {cols} (enter 67 for 67%)",
+        # Batch chart selection
+        "batch_select_charts": "Select charts",
+        "batch_no_charts_selected": "No charts selected",
         # Batch tab
         "batch_caption": "Add a new category (e.g. survey date) to all charts in the presentation at once",
         "new_category_label": "New category name (e.g.: 19.3.26)",
