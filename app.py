@@ -803,219 +803,222 @@ if not st.session_state.get("show_step3", False):
 
     st.divider()
 
+    batch_labels = _build_chart_labels(charts)
+
+    tab_excel, tab_row, tab_col = st.tabs([
+        f"📊 {t('tab_excel')}",
+        f"➕ {t('tab_batch')}",
+        f"➕ {t('tab_batch_col')}",
+    ])
+
     # --- STEP 2: EXCEL IMPORT/EXPORT (ALL CHARTS) ---
-    st.subheader(f"📊 {t('tab_excel')}")
+    with tab_excel:
+        col_export_xl, col_import_xl = st.columns(2, gap="large")
 
-    col_export_xl, col_import_xl = st.columns(2, gap="large")
+        # --- Export ---
+        with col_export_xl:
+            st.markdown(f"**{t('excel_export_title')}**")
+            st.caption(t("excel_export_caption", count=len(charts)))
 
-    # --- Export ---
-    with col_export_xl:
-        st.markdown(f"**{t('excel_export_title')}**")
-        st.caption(t("excel_export_caption", count=len(charts)))
+            sheet_name_map = _build_sheet_name_map(charts)
 
-        sheet_name_map = _build_sheet_name_map(charts)
+            edit_fingerprint = str(sorted(st.session_state.edited_data.keys()))
+            if (st.session_state.get("xl_export_fingerprint") != edit_fingerprint
+                    or "xl_export_bytes" not in st.session_state):
+                xl_buffer = io.BytesIO()
+                with pd.ExcelWriter(xl_buffer, engine="openpyxl") as writer:
+                    for chart_info in charts:
+                        sheet = sheet_name_map[chart_info.key]
+                        get_chart_df(chart_info).to_excel(writer, sheet_name=sheet, index=False)
+                st.session_state.xl_export_bytes = xl_buffer.getvalue()
+                st.session_state.xl_export_fingerprint = edit_fingerprint
 
-        edit_fingerprint = str(sorted(st.session_state.edited_data.keys()))
-        if (st.session_state.get("xl_export_fingerprint") != edit_fingerprint
-                or "xl_export_bytes" not in st.session_state):
-            xl_buffer = io.BytesIO()
-            with pd.ExcelWriter(xl_buffer, engine="openpyxl") as writer:
-                for chart_info in charts:
-                    sheet = sheet_name_map[chart_info.key]
-                    get_chart_df(chart_info).to_excel(writer, sheet_name=sheet, index=False)
-            st.session_state.xl_export_bytes = xl_buffer.getvalue()
-            st.session_state.xl_export_fingerprint = edit_fingerprint
+            base_name = st.session_state.file_name.replace(".pptx", "")
+            st.download_button(
+                label=t("excel_export_button"),
+                data=st.session_state.xl_export_bytes,
+                file_name=f"charts_{base_name}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+            )
 
-        base_name = st.session_state.file_name.replace(".pptx", "")
-        st.download_button(
-            label=t("excel_export_button"),
-            data=st.session_state.xl_export_bytes,
-            file_name=f"charts_{base_name}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
-        )
+        # --- Import ---
+        with col_import_xl:
+            st.markdown(f"**{t('excel_import_title')}**")
+            st.caption(t("excel_import_caption"))
 
-    # --- Import ---
-    with col_import_xl:
-        st.markdown(f"**{t('excel_import_title')}**")
-        st.caption(t("excel_import_caption"))
+            xl_file = st.file_uploader(
+                t("excel_import_upload_label"),
+                type=["xlsx"],
+                key="excel_import_all",
+            )
 
-        xl_file = st.file_uploader(
-            t("excel_import_upload_label"),
-            type=["xlsx"],
-            key="excel_import_all",
-        )
+        # --- Import results (full width, below both columns) ---
+        if xl_file is not None:
+            st.divider()
+            try:
+                xl_cache_key = (xl_file.name, xl_file.size)
+                if st.session_state.get("xl_import_cache_key") != xl_cache_key:
+                    xls = pd.ExcelFile(xl_file, engine="openpyxl")
 
-    # --- Import results (full width, below both columns) ---
-    if xl_file is not None:
-        st.divider()
-        try:
-            xl_cache_key = (xl_file.name, xl_file.size)
-            if st.session_state.get("xl_import_cache_key") != xl_cache_key:
-                xls = pd.ExcelFile(xl_file, engine="openpyxl")
+                    sheet_to_chart = {v: k for k, v in sheet_name_map.items()}
+                    charts_by_key = {ci.key: ci for ci in charts}
 
-                sheet_to_chart = {v: k for k, v in sheet_name_map.items()}
-                charts_by_key = {ci.key: ci for ci in charts}
-
-                changed = []
-                unchanged = 0
-                skipped = []
-                for sheet_name in xls.sheet_names:
-                    chart_key = sheet_to_chart.get(sheet_name)
-                    if chart_key and chart_key in charts_by_key:
-                        ci = charts_by_key[chart_key]
-                        imported_df = pd.read_excel(xls, sheet_name=sheet_name)
-                        expected_cols = len(ci.dataframe.columns)
-                        if len(imported_df.columns) != expected_cols:
-                            skipped.append(t("excel_column_mismatch_warning",
-                                             sheet=sheet_name, expected=expected_cols,
-                                             found=len(imported_df.columns)))
-                        else:
-                            imported_df.columns = ci.dataframe.columns
-                            current_df = get_chart_df(ci)
-                            if not imported_df.equals(current_df):
-                                changed.append((ci, imported_df))
+                    changed = []
+                    unchanged = 0
+                    skipped = []
+                    for sheet_name in xls.sheet_names:
+                        chart_key = sheet_to_chart.get(sheet_name)
+                        if chart_key and chart_key in charts_by_key:
+                            ci = charts_by_key[chart_key]
+                            imported_df = pd.read_excel(xls, sheet_name=sheet_name)
+                            expected_cols = len(ci.dataframe.columns)
+                            if len(imported_df.columns) != expected_cols:
+                                skipped.append(t("excel_column_mismatch_warning",
+                                                 sheet=sheet_name, expected=expected_cols,
+                                                 found=len(imported_df.columns)))
                             else:
-                                unchanged += 1
-                    else:
-                        skipped.append(t("excel_sheet_no_match", sheet=sheet_name))
+                                imported_df.columns = ci.dataframe.columns
+                                current_df = get_chart_df(ci)
+                                if not imported_df.equals(current_df):
+                                    changed.append((ci, imported_df))
+                                else:
+                                    unchanged += 1
+                        else:
+                            skipped.append(t("excel_sheet_no_match", sheet=sheet_name))
 
-                st.session_state.xl_import_cache_key = xl_cache_key
-                st.session_state.xl_import_results = (changed, unchanged, skipped)
+                    st.session_state.xl_import_cache_key = xl_cache_key
+                    st.session_state.xl_import_results = (changed, unchanged, skipped)
 
-            changed, unchanged, skipped = st.session_state.xl_import_results
+                changed, unchanged, skipped = st.session_state.xl_import_results
 
-            if changed:
-                st.success(t("excel_changes_found", changed=len(changed), total=len(changed) + unchanged))
-                if unchanged:
-                    st.caption(t("excel_unchanged", count=unchanged))
+                if changed:
+                    st.success(t("excel_changes_found", changed=len(changed), total=len(changed) + unchanged))
+                    if unchanged:
+                        st.caption(t("excel_unchanged", count=unchanged))
 
-                for ci, df in changed:
-                    st.markdown(f"**{t('slide_num')} {ci.slide_index + 1} — {ci.shape_name}**")
-                    st.dataframe(df, use_container_width=True)
+                    for ci, df in changed:
+                        st.markdown(f"**{t('slide_num')} {ci.slide_index + 1} — {ci.shape_name}**")
+                        st.dataframe(df, use_container_width=True)
 
-                if skipped:
-                    with st.expander(f"⚠️ {len(skipped)}", expanded=False):
-                        for msg in skipped:
-                            st.warning(msg)
+                    if skipped:
+                        with st.expander(f"⚠️ {len(skipped)}", expanded=False):
+                            for msg in skipped:
+                                st.warning(msg)
 
-                if st.button(t("excel_apply_button"), type="primary", use_container_width=True):
-                    with st.spinner(t("excel_apply_spinner", count=len(changed))):
-                        updates = []
-                        for ci, df in changed:
-                            st.session_state.edited_data[ci.key] = df
-                            updates.append((
-                                ci.slide_index,
-                                ci.shape_name,
-                                df,
-                                ci.is_xy,
-                                ci.series_formats,
-                                None,
-                                ci.shape_id,
-                            ))
-                        updated_bytes = update_multiple_charts(
-                            st.session_state.pptx_bytes, updates,
-                        )
-                        st.success(t("excel_apply_success", count=len(changed)))
-                        _commit_update(updated_bytes)
-            elif unchanged > 0:
-                st.info(t("excel_no_changes"))
-            elif xls.sheet_names:
-                st.error(t("excel_no_matches"))
-                for msg in skipped:
-                    st.warning(msg)
-        except Exception as e:
-            st.error(t("file_read_error", e=e))
+                    if st.button(t("excel_apply_button"), type="primary", use_container_width=True):
+                        with st.spinner(t("excel_apply_spinner", count=len(changed))):
+                            updates = []
+                            for ci, df in changed:
+                                st.session_state.edited_data[ci.key] = df
+                                updates.append((
+                                    ci.slide_index,
+                                    ci.shape_name,
+                                    df,
+                                    ci.is_xy,
+                                    ci.series_formats,
+                                    None,
+                                    ci.shape_id,
+                                ))
+                            updated_bytes = update_multiple_charts(
+                                st.session_state.pptx_bytes, updates,
+                            )
+                            st.success(t("excel_apply_success", count=len(changed)))
+                            _commit_update(updated_bytes)
+                elif unchanged > 0:
+                    st.info(t("excel_no_changes"))
+                elif xls.sheet_names:
+                    st.error(t("excel_no_matches"))
+                    for msg in skipped:
+                        st.warning(msg)
+            except Exception as e:
+                st.error(t("file_read_error", e=e))
 
     # --- BATCH ADD ROW ---
-    st.divider()
-    st.subheader(f"➕ {t('tab_batch')}")
-    st.caption(t("batch_caption"))
+    with tab_row:
+        st.caption(t("batch_caption"))
 
-    batch_labels = _build_chart_labels(charts)
-    selected_row_charts = _render_chart_checkboxes("batch_row_s2", charts, batch_labels)
+        selected_row_charts = _render_chart_checkboxes("batch_row_s2", charts, batch_labels)
 
-    new_category = st.text_input(t("new_category_label"), key="batch_category")
+        new_category = st.text_input(t("new_category_label"), key="batch_category")
 
-    if new_category:
-        if not selected_row_charts:
-            st.info(t("batch_no_charts_selected"))
-        else:
-            st.markdown(f"**{t('batch_preview', name=new_category, count=len(selected_row_charts))}**")
+        if new_category:
+            if not selected_row_charts:
+                st.info(t("batch_no_charts_selected"))
+            else:
+                st.markdown(f"**{t('batch_preview', name=new_category, count=len(selected_row_charts))}**")
 
-            if st.button(t("batch_button"), type="primary", use_container_width=True, key="batch_btn_step2"):
-                with st.spinner(t("batch_spinner")):
-                    try:
-                        updates = []
-                        for chart_info in selected_row_charts:
-                            df = get_chart_df(chart_info)
-                            new_row = {df.columns[0]: new_category}
-                            for col in df.columns[1:]:
-                                new_row[col] = None
-                            df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-                            st.session_state.edited_data[chart_info.key] = df
-                            updates.append((chart_info.slide_index, chart_info.shape_name, df, chart_info.is_xy, chart_info.series_formats, None, chart_info.shape_id))
-                        updated_bytes = update_multiple_charts(st.session_state.pptx_bytes, updates)
-                        st.success(t("batch_success", name=new_category, count=len(selected_row_charts)))
-                        _commit_update(updated_bytes)
-                    except Exception as e:
-                        st.error(t("error_generic", e=e))
+                if st.button(t("batch_button"), type="primary", use_container_width=True, key="batch_btn_step2"):
+                    with st.spinner(t("batch_spinner")):
+                        try:
+                            updates = []
+                            for chart_info in selected_row_charts:
+                                df = get_chart_df(chart_info)
+                                new_row = {df.columns[0]: new_category}
+                                for col in df.columns[1:]:
+                                    new_row[col] = None
+                                df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+                                st.session_state.edited_data[chart_info.key] = df
+                                updates.append((chart_info.slide_index, chart_info.shape_name, df, chart_info.is_xy, chart_info.series_formats, None, chart_info.shape_id))
+                            updated_bytes = update_multiple_charts(st.session_state.pptx_bytes, updates)
+                            st.success(t("batch_success", name=new_category, count=len(selected_row_charts)))
+                            _commit_update(updated_bytes)
+                        except Exception as e:
+                            st.error(t("error_generic", e=e))
 
     # --- BATCH ADD COLUMN ---
-    st.divider()
-    st.subheader(f"➕ {t('tab_batch_col')}")
-    st.caption(t("batch_col_caption"))
+    with tab_col:
+        st.caption(t("batch_col_caption"))
 
-    selected_col_charts = _render_chart_checkboxes("batch_col_s2", charts, batch_labels)
+        selected_col_charts = _render_chart_checkboxes("batch_col_s2", charts, batch_labels)
 
-    new_series = st.text_input(t("new_series_label"), key="batch_series_step2")
+        new_series = st.text_input(t("new_series_label"), key="batch_series_step2")
 
-    if new_series:
-        if not selected_col_charts:
-            st.info(t("batch_no_charts_selected"))
-        else:
-            # Warn if column already exists in some charts
-            conflicts = [ci for ci in selected_col_charts if new_series in get_chart_df(ci).columns]
-            if conflicts:
-                st.warning(t("batch_col_exists_warning", name=new_series, count=len(conflicts)))
+        if new_series:
+            if not selected_col_charts:
+                st.info(t("batch_no_charts_selected"))
+            else:
+                # Warn if column already exists in some charts
+                conflicts = [ci for ci in selected_col_charts if new_series in get_chart_df(ci).columns]
+                if conflicts:
+                    st.warning(t("batch_col_exists_warning", name=new_series, count=len(conflicts)))
 
-            st.markdown(f"**{t('batch_col_preview', name=new_series, count=len(selected_col_charts))}**")
+                st.markdown(f"**{t('batch_col_preview', name=new_series, count=len(selected_col_charts))}**")
 
-            if st.button(t("batch_col_button"), type="primary", use_container_width=True, key="batch_col_btn_step2"):
-                with st.spinner(t("batch_col_spinner")):
-                    try:
-                        updates = []
-                        for chart_info in selected_col_charts:
-                            df = get_chart_df(chart_info)
-                            df[new_series] = None
-                            st.session_state.edited_data[chart_info.key] = df
+                if st.button(t("batch_col_button"), type="primary", use_container_width=True, key="batch_col_btn_step2"):
+                    with st.spinner(t("batch_col_spinner")):
+                        try:
+                            updates = []
+                            for chart_info in selected_col_charts:
+                                df = get_chart_df(chart_info)
+                                df[new_series] = None
+                                st.session_state.edited_data[chart_info.key] = df
 
-                            # Inherit format from last existing series
-                            updated_formats = dict(chart_info.series_formats)
-                            last_format = list(updated_formats.values())[-1] if updated_formats else "General"
-                            updated_formats[new_series] = last_format
+                                # Inherit format from last existing series
+                                updated_formats = dict(chart_info.series_formats)
+                                last_format = list(updated_formats.values())[-1] if updated_formats else "General"
+                                updated_formats[new_series] = last_format
 
-                            # New column visible by default
-                            updated_visibility = dict(chart_info.series_visibility)
-                            updated_visibility[new_series] = True
+                                # New column visible by default
+                                updated_visibility = dict(chart_info.series_visibility)
+                                updated_visibility[new_series] = True
 
-                            updates.append((
-                                chart_info.slide_index,
-                                chart_info.shape_name,
-                                df,
-                                chart_info.is_xy,
-                                updated_formats,
-                                updated_visibility,
-                                chart_info.shape_id,
-                            ))
-                        updated_bytes = update_multiple_charts(st.session_state.pptx_bytes, updates)
-                        st.success(t("batch_col_success", name=new_series, count=len(selected_col_charts)))
-                        _commit_update(updated_bytes)
-                    except Exception as e:
-                        st.error(t("error_generic", e=e))
+                                updates.append((
+                                    chart_info.slide_index,
+                                    chart_info.shape_name,
+                                    df,
+                                    chart_info.is_xy,
+                                    updated_formats,
+                                    updated_visibility,
+                                    chart_info.shape_id,
+                                ))
+                            updated_bytes = update_multiple_charts(st.session_state.pptx_bytes, updates)
+                            st.success(t("batch_col_success", name=new_series, count=len(selected_col_charts)))
+                            _commit_update(updated_bytes)
+                        except Exception as e:
+                            st.error(t("error_generic", e=e))
 
     # --- Navigation buttons ---
-    st.divider()
     render_wizard_nav("step2_back", _step2_back, "step2_next", _step2_next)
 
     # If user hasn't clicked Next to step 3, stop here
@@ -1239,11 +1242,13 @@ def _editor_fragment():
 
         st.caption(t("editing_info"))
 
-        # Build column config with widths based on content
         _edit_df = get_chart_df(selected_chart)
+        # Pin column widths to the original (not edited) frame so typing
+        # doesn't resize columns mid-edit and cause visible flicker.
+        _width_df = selected_chart.dataframe
         _col_config = {}
-        for col in _edit_df.columns:
-            max_len = max(len(str(col)), _edit_df[col].astype(str).str.len().max() if len(_edit_df) > 0 else 0)
+        for col in _width_df.columns:
+            max_len = max(len(str(col)), _width_df[col].astype(str).str.len().max() if len(_width_df) > 0 else 0)
             if max_len <= 6:
                 _col_config[col] = st.column_config.Column(width="small")
             elif max_len <= 15:
@@ -1252,15 +1257,14 @@ def _editor_fragment():
                 _col_config[col] = st.column_config.Column(width="large")
 
         editor_key = f"editor_{selected_chart.slide_index}_{selected_chart.shape_id}"
-        with st.container(height=350, border=False):
-            edited_df = st.data_editor(
-                _edit_df,
-                num_rows="dynamic",
-                use_container_width=True,
-                column_config=_col_config,
-                key=editor_key,
-                height=300,
-            )
+        edited_df = st.data_editor(
+            _edit_df,
+            num_rows="dynamic",
+            use_container_width=True,
+            column_config=_col_config,
+            key=editor_key,
+            height=350,
+        )
 
         # Push to undo stack if data changed
         prev_df = st.session_state.edited_data.get(chart_key)
