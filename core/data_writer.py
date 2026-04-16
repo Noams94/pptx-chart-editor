@@ -12,7 +12,7 @@ from lxml import etree
 
 from openpyxl import load_workbook
 
-from core.data_extractor import is_percentage_format, _iter_chart_shapes
+from core.data_extractor import is_percentage_format
 
 
 def _display_to_raw(df: pd.DataFrame, series_formats: dict) -> pd.DataFrame:
@@ -49,7 +49,6 @@ def update_chart_data(
         display_df: DataFrame with display values (67 for 67%)
         is_xy: Whether this is an XY/scatter chart
         series_formats: Dict of series_name -> formatCode for converting display->raw
-        shape_id: Shape ID for disambiguation when shape_name is duplicated
 
     Returns:
         Updated PPTX file bytes
@@ -63,10 +62,10 @@ def update_chart_data(
     prs = Presentation(BytesIO(pptx_bytes))
     slide = prs.slides[slide_index]
 
-    # Find the chart shape (including inside group shapes)
+    # Find the chart shape
     chart_shape = None
-    for shape in _iter_chart_shapes(slide.shapes):
-        if shape.name == shape_name and (shape_id is None or shape.shape_id == shape_id):
+    for shape in slide.shapes:
+        if shape.has_chart and shape.name == shape_name:
             chart_shape = shape
             break
 
@@ -116,29 +115,29 @@ def update_chart_data(
 
 def update_multiple_charts(
     pptx_bytes: bytes,
-    updates: list,
+    updates: list[tuple[int, str, pd.DataFrame, bool, dict | None, dict | None]],
 ) -> bytes:
     """Update multiple charts in a single parse/save cycle.
 
-    Each update is a tuple: (slide_index, shape_name, display_df, is_xy, series_formats[, series_visibility[, shape_id]])
+    Each update is a tuple: (slide_index, shape_name, display_df, is_xy, series_formats, series_visibility)
     """
     prs = Presentation(BytesIO(pptx_bytes))
 
     for update in updates:
-        shape_id = None
-        series_visibility = None
+        # Support 5-tuple, 6-tuple, and 7-tuple (with shape_id) formats
         if len(update) == 7:
-            slide_index, shape_name, display_df, is_xy, series_formats, series_visibility, shape_id = update
+            slide_index, shape_name, display_df, is_xy, series_formats, series_visibility, _shape_id = update
         elif len(update) == 6:
             slide_index, shape_name, display_df, is_xy, series_formats, series_visibility = update
         else:
             slide_index, shape_name, display_df, is_xy, series_formats = update
+            series_visibility = None
         df = _display_to_raw(display_df, series_formats) if series_formats else display_df
         slide = prs.slides[slide_index]
 
         chart_shape = None
-        for shape in _iter_chart_shapes(slide.shapes):
-            if shape.name == shape_name and (shape_id is None or shape.shape_id == shape_id):
+        for shape in slide.shapes:
+            if shape.has_chart and shape.name == shape_name:
                 chart_shape = shape
                 break
         if chart_shape is None:

@@ -36,7 +36,7 @@ TRANSLATIONS = {
         "no_charts_in_slide": "אין גרפים בשקף הנבחר",
         # Tabs
         "tab_edit": "עריכת גרף",
-        "tab_batch": "הוספת שורה לכל הגרפים",
+        "tab_batch": "הוספת שורה לגרפים נבחרים",
         "tab_csv": "ייבוא/ייצוא CSV",
         # Edit tab
         "comparison_toggle": "השוואה לפני/אחרי",
@@ -53,19 +53,21 @@ TRANSLATIONS = {
         # Batch chart selection
         "batch_select_charts": "בחר גרפים",
         "batch_no_charts_selected": "לא נבחרו גרפים",
+        "select_all_charts": "בחר את כל הגרפים",
+        "batch_selected_count": "{selected} מתוך {total} גרפים נבחרו",
         # Batch tab
-        "batch_caption": "הוסף קטגוריה חדשה (למשל תאריך סקר) לכל הגרפים במצגת בבת אחת",
+        "batch_caption": "הוסף קטגוריה חדשה (למשל תאריך סקר) לגרפים הנבחרים",
         "new_category_label": "שם הקטגוריה החדשה (למשל: 19.3.26)",
         "batch_preview": "ייתווסף שורה חדשה '{name}' ל-{count} גרפים",
-        "batch_button": "הוסף שורה לכל הגרפים",
+        "batch_button": "הוסף שורה לגרפים נבחרים",
         "batch_spinner": "מוסיף שורה ומעדכן...",
         "batch_success": "שורה '{name}' נוספה ל-{count} גרפים",
         # Batch add column tab
-        "tab_batch_col": "הוספת עמודה לכל הגרפים",
-        "batch_col_caption": "הוסף סדרה חדשה (למשל תאריך סקר) לכל הגרפים במצגת בבת אחת",
+        "tab_batch_col": "הוספת עמודה לגרפים נבחרים",
+        "batch_col_caption": "הוסף סדרה חדשה (למשל תאריך סקר) לגרפים הנבחרים",
         "new_series_label": "שם הסדרה החדשה (למשל: 15.6.26)",
         "batch_col_preview": "ייתווסף עמודה חדשה '{name}' ל-{count} גרפים",
-        "batch_col_button": "הוסף עמודה לכל הגרפים",
+        "batch_col_button": "הוסף עמודה לגרפים נבחרים",
         "batch_col_spinner": "מוסיף עמודה ומעדכן...",
         "batch_col_success": "עמודה '{name}' נוספה ל-{count} גרפים",
         "batch_col_exists_warning": "עמודה '{name}' כבר קיימת ב-{count} גרפים ותידרס",
@@ -266,7 +268,7 @@ TRANSLATIONS = {
         "no_charts_in_slide": "No charts in the selected slide",
         # Tabs
         "tab_edit": "Edit Chart",
-        "tab_batch": "Add Row to All Charts",
+        "tab_batch": "Add Row to Selected Charts",
         "tab_csv": "CSV Import/Export",
         # Edit tab
         "comparison_toggle": "Before/After Comparison",
@@ -283,19 +285,21 @@ TRANSLATIONS = {
         # Batch chart selection
         "batch_select_charts": "Select charts",
         "batch_no_charts_selected": "No charts selected",
+        "select_all_charts": "Select All Charts",
+        "batch_selected_count": "{selected} of {total} charts selected",
         # Batch tab
-        "batch_caption": "Add a new category (e.g. survey date) to all charts in the presentation at once",
+        "batch_caption": "Add a new category (e.g. survey date) to the selected charts",
         "new_category_label": "New category name (e.g.: 19.3.26)",
         "batch_preview": "A new row '{name}' will be added to {count} charts",
-        "batch_button": "Add Row to All Charts",
+        "batch_button": "Add Row to Selected Charts",
         "batch_spinner": "Adding row and updating...",
         "batch_success": "Row '{name}' added to {count} charts",
         # Batch add column tab
-        "tab_batch_col": "Add Column to All Charts",
-        "batch_col_caption": "Add a new series (e.g. poll date) to all charts in the presentation at once",
+        "tab_batch_col": "Add Column to Selected Charts",
+        "batch_col_caption": "Add a new series (e.g. poll date) to the selected charts",
         "new_series_label": "New series/column name (e.g.: 15.6.26)",
         "batch_col_preview": "A new column '{name}' will be added to {count} charts",
-        "batch_col_button": "Add Column to All Charts",
+        "batch_col_button": "Add Column to Selected Charts",
         "batch_col_spinner": "Adding column and updating...",
         "batch_col_success": "Column '{name}' added to {count} charts",
         "batch_col_exists_warning": "Column '{name}' already exists in {count} chart(s) and will be overwritten",

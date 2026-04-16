@@ -12,18 +12,7 @@ from pptx.chart.chart import Chart
 from pptx.enum.chart import XL_CHART_TYPE
 from pptx.oxml.ns import qn
 
-from pptx.enum.shapes import MSO_SHAPE_TYPE
-
 from ui.rtl_support import t, chart_type_display_name
-
-
-def _iter_chart_shapes(shapes):
-    """Yield all chart-bearing shapes, recursing into group shapes."""
-    for shape in shapes:
-        if shape.has_chart:
-            yield shape
-        if shape.shape_type == MSO_SHAPE_TYPE.GROUP:
-            yield from _iter_chart_shapes(shape.shapes)
 
 
 # Chart types that use XyChartData (scatter plots)
@@ -97,7 +86,6 @@ def _extract_series_visibility(chart: Chart) -> dict[str, bool]:
 class ChartInfo:
     slide_index: int
     shape_name: str
-    shape_id: int  # unique within a slide, needed when shape_name is duplicated
     chart_type: int
     chart_type_name: str
     dataframe: pd.DataFrame          # Display values (67 for 67%)
@@ -106,11 +94,11 @@ class ChartInfo:
     series_formats: dict = field(default_factory=dict)  # series_name -> formatCode
     series_visibility: dict = field(default_factory=dict)  # series_name -> bool (visible)
     chart_title: str = ""            # Chart title from XML (if available)
+    shape_id: int = 0                # Shape ID for unique identification
 
     @property
-    def key(self) -> tuple:
-        """Unique identifier for this chart: (slide_index, shape_name, shape_id)."""
-        return (self.slide_index, self.shape_name, self.shape_id)
+    def key(self):
+        return (self.slide_index, self.shape_name)
 
 
 def _extract_chart_data(chart: Chart) -> tuple[pd.DataFrame, bool, list[str], dict, dict]:
@@ -178,7 +166,10 @@ def extract_all_charts(pptx_bytes: bytes) -> list[ChartInfo]:
     charts = []
 
     for slide_idx, slide in enumerate(prs.slides):
-        for shape in _iter_chart_shapes(slide.shapes):
+        for shape in slide.shapes:
+            if not shape.has_chart:
+                continue
+
             chart = shape.chart
             try:
                 display_df, is_xy, series_names, series_formats, series_visibility = _extract_chart_data(chart)
@@ -189,7 +180,6 @@ def extract_all_charts(pptx_bytes: bytes) -> list[ChartInfo]:
                 info = ChartInfo(
                     slide_index=slide_idx,
                     shape_name=shape.name,
-                    shape_id=shape.shape_id,
                     chart_type=chart.chart_type,
                     chart_type_name=chart_type_display_name(chart.chart_type),
                     dataframe=display_df,
@@ -198,6 +188,7 @@ def extract_all_charts(pptx_bytes: bytes) -> list[ChartInfo]:
                     series_formats=series_formats,
                     series_visibility=series_visibility,
                     chart_title=title_text,
+                    shape_id=shape.shape_id,
                 )
                 charts.append(info)
             except Exception as e:
