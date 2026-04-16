@@ -453,6 +453,32 @@ def show_progress_indicator(current_step: int, total_steps: int = 3):
     st.markdown(html, unsafe_allow_html=True)
 
 
+def render_wizard_nav(back_key, on_back, next_key=None, on_next=None):
+    col_back, _, col_next = st.columns([1, 2, 1])
+    with col_back:
+        if st.button(t("wizard_back"), use_container_width=True, key=back_key):
+            on_back()
+            st.rerun()
+    if next_key is not None and on_next is not None:
+        with col_next:
+            if st.button(t("wizard_next"), type="primary", use_container_width=True, key=next_key):
+                on_next()
+                st.rerun()
+
+
+def _step2_back():
+    st.session_state.wizard_step = 1
+
+
+def _step2_next():
+    st.session_state.show_step3 = True
+
+
+def _step3_back():
+    st.session_state.selected_slide = None
+    st.session_state.show_step3 = False
+
+
 def render_user_guide():
     """Render the bilingual user guide content."""
     st.markdown(f"### {t('guide_overview_title')}")
@@ -761,15 +787,7 @@ if not st.session_state.get("show_step3", False):
     # --- Step 2: Edit all charts via Excel ---
     show_progress_indicator(2)
 
-    col_back_top, _, col_next_top = st.columns([1, 2, 1])
-    with col_back_top:
-        if st.button(t("wizard_back"), use_container_width=True, key="step2_back_top"):
-            st.session_state.wizard_step = 1
-            st.rerun()
-    with col_next_top:
-        if st.button(t("wizard_next"), type="primary", use_container_width=True, key="step2_next_top"):
-            st.session_state.show_step3 = True
-            st.rerun()
+    render_wizard_nav("step2_back_top", _step2_back, "step2_next_top", _step2_next)
 
     st.success(f"✅ {t('wizard_upload_done', name=st.session_state.file_name)}")
 
@@ -998,16 +1016,7 @@ if not st.session_state.get("show_step3", False):
 
     # --- Navigation buttons ---
     st.divider()
-    col_back, _, col_next = st.columns([1, 2, 1])
-    with col_back:
-        if st.button(t("wizard_back"), use_container_width=True, key="step2_back"):
-            # Go back to step 1 — keep the uploaded file
-            st.session_state.wizard_step = 1
-            st.rerun()
-    with col_next:
-        if st.button(t("wizard_next"), type="primary", use_container_width=True, key="step2_next"):
-            st.session_state.show_step3 = True
-            st.rerun()
+    render_wizard_nav("step2_back", _step2_back, "step2_next", _step2_next)
 
     # If user hasn't clicked Next to step 3, stop here
     if not st.session_state.get("show_step3", False):
@@ -1018,12 +1027,7 @@ if not st.session_state.get("show_step3", False):
 
 show_progress_indicator(3)
 
-col_back_s3_top, _, _ = st.columns([1, 2, 1])
-with col_back_s3_top:
-    if st.button(t("wizard_back"), use_container_width=True, key="step3_back_top"):
-        st.session_state.selected_slide = None
-        st.session_state.show_step3 = False
-        st.rerun()
+render_wizard_nav("step3_back_top", _step3_back)
 
 # Show slide selection UI if none selected yet
 if st.session_state.selected_slide is None:
@@ -1059,11 +1063,7 @@ if st.session_state.selected_slide is None:
                 st.image(s_images[s_idx], use_container_width=True)
 
     st.divider()
-    col_back3, _, _ = st.columns([1, 2, 1])
-    with col_back3:
-        if st.button(t("wizard_back"), use_container_width=True, key="step3_back_noselection"):
-            st.session_state.show_step3 = False
-            st.rerun()
+    render_wizard_nav("step3_back_noselection", _step3_back)
     st.stop()
 
 slide_idx = st.session_state.selected_slide
