@@ -55,12 +55,14 @@ def render_chart_plotly(
     chart_type: int,
     series_visibility: dict[str, bool],
     series_formats: dict[str, str],
+    series_colors: dict[str, str] | None = None,
 ) -> go.Figure:
     """Build a Plotly figure from chart data and metadata."""
     fig = go.Figure()
     cat_col = df.columns[0]
     categories = df[cat_col].tolist()
     series_cols = [c for c in df.columns[1:] if series_visibility.get(c, True)]
+    colors = series_colors or {}
 
     has_pct = any(is_percentage_format(series_formats.get(c, "")) for c in series_cols)
 
@@ -69,11 +71,13 @@ def render_chart_plotly(
         if series_cols:
             col = series_cols[0]
             hole = 0.4 if chart_type == XL_CHART_TYPE.DOUGHNUT else 0
+            pie_colors = [colors.get(c) or None for c in categories]
             fig.add_trace(go.Pie(
                 labels=categories,
                 values=df[col].tolist(),
                 hole=hole,
                 name=col,
+                marker=dict(colors=pie_colors) if any(pie_colors) else None,
             ))
         fig.update_layout(margin=dict(t=30, b=30, l=30, r=30))
         return fig
@@ -84,11 +88,14 @@ def render_chart_plotly(
             x_col = series_cols[i] if i < len(series_cols) else None
             y_col = series_cols[i + 1] if i + 1 < len(series_cols) else None
             if x_col and y_col:
+                series_name = x_col.replace("X_", "")
+                color = colors.get(series_name) or colors.get(x_col) or None
                 fig.add_trace(go.Scatter(
                     x=df[x_col].tolist(),
                     y=df[y_col].tolist(),
                     mode="markers",
-                    name=x_col.replace("X_", ""),
+                    name=series_name,
+                    marker=dict(color=color) if color else {},
                 ))
         fig.update_layout(margin=dict(t=30, b=30, l=50, r=30))
         return fig
@@ -99,21 +106,36 @@ def render_chart_plotly(
 
     for col in series_cols:
         values = df[col].tolist()
+        color = colors.get(col) or None
 
         if chart_type in _BAR_TYPES:
-            fig.add_trace(go.Bar(x=categories, y=values, name=col))
+            fig.add_trace(go.Bar(
+                x=categories, y=values, name=col,
+                marker_color=color,
+            ))
         elif chart_type in _HBAR_TYPES:
-            fig.add_trace(go.Bar(x=values, y=categories, name=col, orientation="h"))
+            fig.add_trace(go.Bar(
+                x=values, y=categories, name=col, orientation="h",
+                marker_color=color,
+            ))
         elif chart_type in _LINE_TYPES:
             mode = "lines+markers" if chart_type == XL_CHART_TYPE.LINE_MARKERS else "lines"
-            fig.add_trace(go.Scatter(x=categories, y=values, mode=mode, name=col))
+            fig.add_trace(go.Scatter(
+                x=categories, y=values, mode=mode, name=col,
+                line=dict(color=color) if color else {},
+                marker=dict(color=color) if color else {},
+            ))
         elif chart_type in _AREA_TYPES:
             fig.add_trace(go.Scatter(
                 x=categories, y=values, mode="lines", fill="tonexty", name=col,
+                line=dict(color=color) if color else {},
             ))
         else:
             # Fallback: bar chart
-            fig.add_trace(go.Bar(x=categories, y=values, name=col))
+            fig.add_trace(go.Bar(
+                x=categories, y=values, name=col,
+                marker_color=color,
+            ))
 
     fig.update_layout(
         barmode=barmode,

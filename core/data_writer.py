@@ -39,6 +39,7 @@ def update_chart_data(
     series_formats: dict = None,
     series_visibility: dict = None,
     shape_id: int = None,
+    series_colors: dict = None,
 ) -> bytes:
     """Update a single chart's data in the PPTX and return updated bytes.
 
@@ -107,6 +108,10 @@ def update_chart_data(
     # Restore series visibility state
     if series_visibility:
         _restore_visibility(chart, series_visibility)
+
+    # Restore series colors
+    if series_colors:
+        _restore_series_colors(chart, series_colors)
 
     output = BytesIO()
     prs.save(output)
@@ -272,3 +277,52 @@ def _restore_visibility(chart, series_visibility: dict):
             # Series should be visible — remove c:delete if present
             if delete_el is not None:
                 ser.remove(delete_el)
+
+
+def _restore_series_colors(chart, series_colors: dict):
+    """Restore series fill colors in chart XML after replace_data() resets them.
+
+    series_colors maps series_name -> hex color string (e.g. '#4472C4') or ''.
+    Empty strings are skipped (no color override).
+    Sets c:spPr > a:solidFill > a:srgbClr for bar/column/area/pie charts.
+    Also updates a:ln > a:solidFill for line charts if a:ln already exists.
+    """
+    chart_xml = chart.part._element
+    color_values = list(series_colors.values())
+
+    for idx, ser in enumerate(chart_xml.iter(qn('c:ser'))):
+        if idx >= len(color_values):
+            break
+
+        hex_color = color_values[idx]
+        if not hex_color:
+            continue  # No explicit color — leave as default
+
+        hex_val = hex_color.lstrip('#').upper()
+
+        # Find or create c:spPr
+        spPr = ser.find(qn('c:spPr'))
+        if spPr is None:
+            spPr = etree.SubElement(ser, qn('c:spPr'))
+
+        # Set fill solidFill (bar, column, area, pie)
+        solidFill = spPr.find(qn('a:solidFill'))
+        if solidFill is None:
+            solidFill = etree.SubElement(spPr, qn('a:solidFill'))
+        else:
+            for child in list(solidFill):
+                solidFill.remove(child)
+        srgbClr = etree.SubElement(solidFill, qn('a:srgbClr'))
+        srgbClr.set('val', hex_val)
+
+        # Also update line color if a:ln already exists (line/scatter charts)
+        ln = spPr.find(qn('a:ln'))
+        if ln is not None:
+            ln_fill = ln.find(qn('a:solidFill'))
+            if ln_fill is None:
+                ln_fill = etree.SubElement(ln, qn('a:solidFill'))
+            else:
+                for child in list(ln_fill):
+                    ln_fill.remove(child)
+            ln_srgb = etree.SubElement(ln_fill, qn('a:srgbClr'))
+            ln_srgb.set('val', hex_val)

@@ -82,6 +82,31 @@ def _extract_series_visibility(chart: Chart) -> dict[str, bool]:
     return visibility
 
 
+def _extract_series_colors(chart: Chart) -> list[str]:
+    """Extract fill colors per series from chart XML.
+
+    Looks for explicit sRGB colors in c:spPr > a:solidFill > a:srgbClr.
+    Returns list of hex color strings (e.g., '#4472C4') or '' if not set.
+    """
+    colors = []
+    chart_xml = chart.part._element
+
+    for ser in chart_xml.iter(qn('c:ser')):
+        color = ""
+        spPr = ser.find(qn('c:spPr'))
+        if spPr is not None:
+            solidFill = spPr.find(qn('a:solidFill'))
+            if solidFill is not None:
+                srgbClr = solidFill.find(qn('a:srgbClr'))
+                if srgbClr is not None:
+                    val = srgbClr.get('val', '')
+                    if val:
+                        color = '#' + val.upper()
+        colors.append(color)
+
+    return colors
+
+
 @dataclass
 class ChartInfo:
     slide_index: int
@@ -93,6 +118,7 @@ class ChartInfo:
     series_names: list = field(default_factory=list)
     series_formats: dict = field(default_factory=dict)  # series_name -> formatCode
     series_visibility: dict = field(default_factory=dict)  # series_name -> bool (visible)
+    series_colors: dict = field(default_factory=dict)    # series_name -> hex color (e.g. '#4472C4') or ''
     chart_title: str = ""            # Chart title from XML (if available)
     shape_id: int = 0                # Shape ID for unique identification
 
@@ -101,7 +127,7 @@ class ChartInfo:
         return (self.slide_index, self.shape_name)
 
 
-def _extract_chart_data(chart: Chart) -> tuple[pd.DataFrame, bool, list[str], dict, dict]:
+def _extract_chart_data(chart: Chart) -> tuple[pd.DataFrame, bool, list[str], dict, dict, dict]:
     """Extract data from a chart into a display DataFrame."""
     chart_type = chart.chart_type
     is_xy = chart_type in XY_CHART_TYPES
@@ -122,6 +148,12 @@ def _extract_chart_data(chart: Chart) -> tuple[pd.DataFrame, bool, list[str], di
     series_visibility = {}
     for i, name in enumerate(series_names):
         series_visibility[name] = visibility_by_idx.get(i, True)
+
+    # Extract colors per series
+    color_list = _extract_series_colors(chart)
+    series_colors = {}
+    for i, name in enumerate(series_names):
+        series_colors[name] = color_list[i] if i < len(color_list) else ""
 
     if is_xy:
         data = {}
@@ -157,7 +189,7 @@ def _extract_chart_data(chart: Chart) -> tuple[pd.DataFrame, bool, list[str], di
 
         display_df = pd.DataFrame(display_data)
 
-    return display_df, is_xy, series_names, series_formats, series_visibility
+    return display_df, is_xy, series_names, series_formats, series_visibility, series_colors
 
 
 def extract_all_charts(pptx_bytes: bytes) -> list[ChartInfo]:
@@ -172,7 +204,7 @@ def extract_all_charts(pptx_bytes: bytes) -> list[ChartInfo]:
 
             chart = shape.chart
             try:
-                display_df, is_xy, series_names, series_formats, series_visibility = _extract_chart_data(chart)
+                display_df, is_xy, series_names, series_formats, series_visibility, series_colors = _extract_chart_data(chart)
                 # Extract chart title if available
                 title_text = ""
                 if chart.has_title and chart.chart_title and chart.chart_title.has_text_frame:
@@ -187,6 +219,7 @@ def extract_all_charts(pptx_bytes: bytes) -> list[ChartInfo]:
                     series_names=series_names,
                     series_formats=series_formats,
                     series_visibility=series_visibility,
+                    series_colors=series_colors,
                     chart_title=title_text,
                     shape_id=shape.shape_id,
                 )

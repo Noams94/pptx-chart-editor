@@ -545,6 +545,7 @@ def show_interactive_wizard():
                 st.session_state.original_charts = None
                 st.session_state.charts_cache = None
                 st.session_state.series_visibility = {}
+                st.session_state.series_colors = {}
                 st.session_state.undo_stack = []
                 st.rerun()
             st.success(f"✅ {t('wizard_upload_done', name=wizard_file.name)}")
@@ -683,6 +684,7 @@ if uploaded_file is not None and st.session_state.get("file_name") != uploaded_f
     st.session_state.original_charts = None
     st.session_state.charts_cache = None
     st.session_state.series_visibility = {}
+    st.session_state.series_colors = {}
     st.session_state.undo_stack = []
 # If no sidebar file but we have pptx_bytes from wizard, that's already initialized
 
@@ -1061,7 +1063,7 @@ with col_back_s3:
 # Layout: Left (Preview) | Right (Editor)
 col_preview, col_editor = st.columns([1, 1], gap="large")
 
-# --- LEFT COLUMN: Preview ---
+# --- Chart selection (outside fragments so both columns can reference it) ---
 with col_preview:
     st.markdown(f"### 👁️ {t('preview_section_title')}")
 
@@ -1122,8 +1124,11 @@ with col_preview:
     current_vis = st.session_state.get("series_visibility", {}).get(
         chart_key, selected_chart.series_visibility
     )
+    current_colors = st.session_state.get("series_colors", {}).get(
+        chart_key, selected_chart.series_colors
+    )
 
-    # Plotly Chart Preview with Before/After
+    # Plotly Chart Preview with Before/After — stable DOM structure
     col_chart_title, col_chart_toggle = st.columns([3, 1])
     with col_chart_title:
         st.markdown(f"**{t('chart_preview')}**")
@@ -1135,32 +1140,39 @@ with col_preview:
         )
         st.session_state.show_chart_comparison = show_chart_comparison
 
-    if show_chart_comparison:
-        chart_col_before, chart_col_after = st.columns(2, gap="medium")
-        with chart_col_before:
-            st.caption(t("before"))
-            original_df = st.session_state.original_charts.get(chart_key)
-            if original_df is not None:
-                fig_before = render_chart_plotly(
-                    original_df, selected_chart.chart_type,
-                    selected_chart.series_visibility, selected_chart.series_formats,
+    # Always render two columns to prevent layout shift when toggling
+    chart_col_before, chart_col_after = st.columns(2, gap="medium")
+    with chart_col_before:
+        with st.container(height=400, border=False):
+            if show_chart_comparison:
+                st.caption(t("before"))
+                original_df = st.session_state.original_charts.get(chart_key)
+                if original_df is not None:
+                    fig_before = render_chart_plotly(
+                        original_df, selected_chart.chart_type,
+                        selected_chart.series_visibility, selected_chart.series_formats,
+                        selected_chart.series_colors,
+                    )
+                    st.plotly_chart(fig_before, use_container_width=True, key=f"plotly_before_{chart_key}")
+            else:
+                fig_current = render_chart_plotly(
+                    current_df, selected_chart.chart_type,
+                    current_vis, selected_chart.series_formats,
+                    current_colors,
                 )
-                st.plotly_chart(fig_before, use_container_width=True, key=f"plotly_before_{chart_key}")
-        with chart_col_after:
-            st.caption(t("after"))
-            fig_after = render_chart_plotly(
-                current_df, selected_chart.chart_type,
-                current_vis, selected_chart.series_formats,
-            )
-            st.plotly_chart(fig_after, use_container_width=True, key=f"plotly_after_{chart_key}")
-    else:
-        fig_current = render_chart_plotly(
-            current_df, selected_chart.chart_type,
-            current_vis, selected_chart.series_formats,
-        )
-        st.plotly_chart(fig_current, use_container_width=True, key=f"plotly_current_{chart_key}")
+                st.plotly_chart(fig_current, use_container_width=True, key=f"plotly_current_{chart_key}")
+    with chart_col_after:
+        with st.container(height=400, border=False):
+            if show_chart_comparison:
+                st.caption(t("after"))
+                fig_after = render_chart_plotly(
+                    current_df, selected_chart.chart_type,
+                    current_vis, selected_chart.series_formats,
+                    current_colors,
+                )
+                st.plotly_chart(fig_after, use_container_width=True, key=f"plotly_after_{chart_key}")
 
-    # Full Slide Before/After comparison
+    # Full Slide Before/After comparison — stable DOM structure
     col_slide_title, col_slide_toggle = st.columns([3, 1])
     with col_slide_title:
         st.markdown(f"**{t('full_slide_preview')}**")
@@ -1172,29 +1184,28 @@ with col_preview:
         )
         st.session_state.show_slide_comparison = show_slide_comparison
 
-    if show_slide_comparison:
-        slide_col_before, slide_col_after = st.columns(2, gap="medium")
-        with slide_col_before:
+    # Always render two columns to prevent layout shift
+    slide_col_before, slide_col_after = st.columns(2, gap="medium")
+    with slide_col_before:
+        if show_slide_comparison:
             st.caption(t("before"))
             original_images = st.session_state.original_slide_images or []
             if original_images and slide_idx < len(original_images):
                 st.image(original_images[slide_idx], use_container_width=True)
-        with slide_col_after:
+    with slide_col_after:
+        if show_slide_comparison:
             st.caption(t("after"))
             if slide_images and slide_idx < len(slide_images):
                 st.image(slide_images[slide_idx], use_container_width=True,
                          caption=f"{t('slide_num')} {slide_idx + 1}")
             else:
                 st.info(t("render_hint"))
-    else:
-        # Only show if not already shown above
-        pass
 
 
-# --- RIGHT COLUMN: Editor ---
-with col_editor:
-    st.markdown(f"### 📝 {t('editor_section_title')}")
-
+# --- RIGHT COLUMN: Editor (wrapped in @st.fragment for partial reruns) ---
+@st.fragment
+def _editor_fragment():
+    """Editor fragment — only this section reruns on widget interaction."""
     tab_edit, tab_select_data, tab_csv, tab_batch, tab_batch_col = st.tabs([t("tab_edit"), t("tab_select_data"), t("tab_csv"), t("tab_batch"), t("tab_batch_col")])
 
     # --- EDIT CHART TAB ---
@@ -1224,14 +1235,15 @@ with col_editor:
                 _col_config[col] = st.column_config.Column(width="large")
 
         editor_key = f"editor_{selected_chart.slide_index}_{selected_chart.shape_id}"
-        edited_df = st.data_editor(
-            _edit_df,
-            num_rows="dynamic",
-            use_container_width=True,
-            column_config=_col_config,
-            key=editor_key,
-            height=300,
-        )
+        with st.container(height=350, border=False):
+            edited_df = st.data_editor(
+                _edit_df,
+                num_rows="dynamic",
+                use_container_width=True,
+                column_config=_col_config,
+                key=editor_key,
+                height=300,
+            )
 
         # Push to undo stack if data changed
         prev_df = st.session_state.edited_data.get(chart_key)
@@ -1259,6 +1271,9 @@ with col_editor:
                          help=None if has_unsaved else t("save_disabled_hint")):
                 with st.spinner(t("saving_to_pptx")):
                     try:
+                        save_colors = st.session_state.get("series_colors", {}).get(
+                            chart_key, selected_chart.series_colors
+                        )
                         updated_bytes = update_chart_data(
                             st.session_state.pptx_bytes,
                             selected_chart.slide_index,
@@ -1268,6 +1283,7 @@ with col_editor:
                             selected_chart.series_formats,
                             current_vis,
                             selected_chart.shape_id,
+                            save_colors,
                         )
                         st.session_state.pptx_bytes = updated_bytes
                         st.session_state.charts_cache = None
@@ -1286,7 +1302,7 @@ with col_editor:
                 use_container_width=True,
             )
 
-    # --- SELECT DATA TAB (Series Visibility) ---
+    # --- SELECT DATA TAB (Series Visibility + Colors) ---
     with tab_select_data:
         st.subheader(t("tab_select_data"))
         st.caption(t("select_data_caption"))
@@ -1296,23 +1312,43 @@ with col_editor:
             st.session_state.series_visibility = {}
         if vis_key not in st.session_state.series_visibility:
             st.session_state.series_visibility[vis_key] = dict(selected_chart.series_visibility)
+        if "series_colors" not in st.session_state:
+            st.session_state.series_colors = {}
+        if vis_key not in st.session_state.series_colors:
+            st.session_state.series_colors[vis_key] = dict(selected_chart.series_colors)
 
         current_visibility = st.session_state.series_visibility[vis_key]
+        current_color_state = st.session_state.series_colors[vis_key]
 
         if selected_chart.is_xy:
             series_display_names = selected_chart.series_names
         else:
             series_display_names = list(selected_chart.series_visibility.keys())
 
+        # Default PowerPoint color palette for series without explicit colors
+        _DEFAULT_COLORS = ['#4472C4', '#ED7D31', '#A9D18E', '#FFC000', '#5B9BD5', '#70AD47', '#FF0000', '#7030A0']
+
         st.markdown(f"**{t('series_visible_label')}**")
         updated_visibility = {}
-        for name in series_display_names:
-            visible = current_visibility.get(name, True)
-            updated_visibility[name] = st.checkbox(
-                name,
-                value=visible,
-                key=f"vis_{selected_chart.slide_index}_{selected_chart.shape_id}_{name}",
-            )
+        updated_colors = {}
+        for i, name in enumerate(series_display_names):
+            col_chk, col_clr = st.columns([3, 1])
+            with col_chk:
+                visible = current_visibility.get(name, True)
+                updated_visibility[name] = st.checkbox(
+                    name,
+                    value=visible,
+                    key=f"vis_{selected_chart.slide_index}_{selected_chart.shape_id}_{name}",
+                )
+            with col_clr:
+                # Use extracted color, or default palette color if none set
+                default_clr = current_color_state.get(name) or _DEFAULT_COLORS[i % len(_DEFAULT_COLORS)]
+                updated_colors[name] = st.color_picker(
+                    "🎨",
+                    value=default_clr,
+                    key=f"clr_{selected_chart.slide_index}_{selected_chart.shape_id}_{name}",
+                    label_visibility="collapsed",
+                )
 
         visible_count = sum(1 for v in updated_visibility.values() if v)
         hidden_count = len(updated_visibility) - visible_count
@@ -1323,6 +1359,7 @@ with col_editor:
             st.success(t("all_series_visible"))
 
         st.session_state.series_visibility[vis_key] = updated_visibility
+        st.session_state.series_colors[vis_key] = updated_colors
 
         if visible_count == 0:
             st.error(t("at_least_one_series"))
@@ -1339,6 +1376,7 @@ with col_editor:
                         selected_chart.series_formats,
                         updated_visibility,
                         selected_chart.shape_id,
+                        updated_colors,
                     )
                     st.success(t("visibility_updated"))
                     _commit_update(updated_bytes)
@@ -1399,6 +1437,9 @@ with col_editor:
                                 csv_vis = st.session_state.get("series_visibility", {}).get(
                                     chart_key, selected_chart.series_visibility
                                 )
+                                csv_colors = st.session_state.get("series_colors", {}).get(
+                                    chart_key, selected_chart.series_colors
+                                )
                                 updated_bytes = update_chart_data(
                                     st.session_state.pptx_bytes,
                                     selected_chart.slide_index,
@@ -1408,6 +1449,7 @@ with col_editor:
                                     selected_chart.series_formats,
                                     csv_vis,
                                     selected_chart.shape_id,
+                                    csv_colors,
                                 )
                                 st.success(t("import_success"))
                                 _commit_update(updated_bytes)
@@ -1520,3 +1562,7 @@ with col_editor:
                         except Exception as e:
                             st.error(t("error_generic", e=e))
 
+
+with col_editor:
+    st.markdown(f"### 📝 {t('editor_section_title')}")
+    _editor_fragment()
