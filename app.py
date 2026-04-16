@@ -761,6 +761,16 @@ if not st.session_state.get("show_step3", False):
     # --- Step 2: Edit all charts via Excel ---
     show_progress_indicator(2)
 
+    col_back_top, _, col_next_top = st.columns([1, 2, 1])
+    with col_back_top:
+        if st.button(t("wizard_back"), use_container_width=True, key="step2_back_top"):
+            st.session_state.wizard_step = 1
+            st.rerun()
+    with col_next_top:
+        if st.button(t("wizard_next"), type="primary", use_container_width=True, key="step2_next_top"):
+            st.session_state.show_step3 = True
+            st.rerun()
+
     st.success(f"✅ {t('wizard_upload_done', name=st.session_state.file_name)}")
 
     # Overview metrics
@@ -1007,6 +1017,13 @@ if not st.session_state.get("show_step3", False):
 # ==================== STEP 3: SELECTED SLIDE VIEW - SPLIT SCREEN ====================
 
 show_progress_indicator(3)
+
+col_back_s3_top, _, _ = st.columns([1, 2, 1])
+with col_back_s3_top:
+    if st.button(t("wizard_back"), use_container_width=True, key="step3_back_top"):
+        st.session_state.selected_slide = None
+        st.session_state.show_step3 = False
+        st.rerun()
 
 # Show slide selection UI if none selected yet
 if st.session_state.selected_slide is None:
