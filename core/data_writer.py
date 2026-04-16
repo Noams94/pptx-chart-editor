@@ -10,6 +10,8 @@ from pptx.chart.data import CategoryChartData, XyChartData
 from pptx.oxml.ns import qn
 from lxml import etree
 
+from openpyxl import load_workbook
+
 from core.data_extractor import is_percentage_format, _iter_chart_shapes
 
 
@@ -101,6 +103,7 @@ def update_chart_data(
     # Restore number format codes that replace_data() resets to "General"
     if series_formats:
         _restore_format_codes(chart, series_formats)
+        _format_embedded_excel(chart, series_formats)
 
     # Restore series visibility state
     if series_visibility:
@@ -168,12 +171,50 @@ def update_multiple_charts(
         chart.replace_data(chart_data)
         if series_formats:
             _restore_format_codes(chart, series_formats)
+            _format_embedded_excel(chart, series_formats)
         if series_visibility:
             _restore_visibility(chart, series_visibility)
 
     output = BytesIO()
     prs.save(output)
     return output.getvalue()
+
+
+def _format_embedded_excel(chart, series_formats: dict):
+    """Apply number formats to the embedded Excel workbook inside the chart.
+
+    chart.replace_data() regenerates the embedded xlsx with 'General' format
+    on all cells. When PowerPoint refreshes data from this source, it displays
+    raw decimals (0.15) instead of formatted percentages (15%).
+
+    This writes the correct number format codes into the embedded workbook
+    cells so PowerPoint inherits the intended display format.
+    """
+    try:
+        xlsx_part = chart.part.chart_workbook.xlsx_part
+        wb = load_workbook(BytesIO(xlsx_part.blob))
+    except Exception:
+        return  # No embedded workbook to format
+
+    ws = wb.active
+    if ws is None or ws.max_row is None or ws.max_column is None:
+        return
+
+    format_values = list(series_formats.values())
+
+    # Column 1 = categories, columns 2+ = series data (1-based indexing)
+    for col_offset, fmt_code in enumerate(format_values):
+        excel_col = col_offset + 2  # skip category column
+        if excel_col > ws.max_column:
+            break
+        for row in range(2, ws.max_row + 1):  # skip header row
+            cell = ws.cell(row=row, column=excel_col)
+            if cell.value is not None:
+                cell.number_format = fmt_code
+
+    buf = BytesIO()
+    wb.save(buf)
+    xlsx_part.blob = buf.getvalue()
 
 
 def _restore_format_codes(chart, series_formats: dict):
