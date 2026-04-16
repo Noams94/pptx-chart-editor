@@ -53,7 +53,8 @@ TRANSLATIONS = {
         # Batch chart selection
         "batch_select_charts": "בחר גרפים",
         "batch_no_charts_selected": "לא נבחרו גרפים",
-        "select_all_charts": "בחר את כל הגרפים",
+        "select_all_charts": "בחר הכל",
+        "clear_all_charts": "נקה הכל",
         "batch_selected_count": "{selected} מתוך {total} גרפים נבחרו",
         # Batch tab
         "batch_caption": "הוסף קטגוריה חדשה (למשל תאריך סקר) לגרפים הנבחרים",
@@ -285,7 +286,8 @@ TRANSLATIONS = {
         # Batch chart selection
         "batch_select_charts": "Select charts",
         "batch_no_charts_selected": "No charts selected",
-        "select_all_charts": "Select All Charts",
+        "select_all_charts": "Select All",
+        "clear_all_charts": "Clear All",
         "batch_selected_count": "{selected} of {total} charts selected",
         # Batch tab
         "batch_caption": "Add a new category (e.g. survey date) to the selected charts",

@@ -387,22 +387,25 @@ def _build_chart_labels(charts_list):
 
 
 def _render_chart_checkboxes(key_prefix: str, charts_list, labels: list) -> list:
-    """Render chart selection with Select All toggle and individual checkboxes."""
-    select_all = st.checkbox(
-        t("select_all_charts"), value=True, key=f"{key_prefix}_select_all",
-    )
-    if select_all:
-        for i in range(len(charts_list)):
-            st.session_state[f"{key_prefix}_cb_{i}"] = True
-        st.caption(t("batch_selected_count", selected=len(charts_list), total=len(charts_list)))
-        return list(charts_list)
+    """Render chart selection with Select All / Clear All toggles and individual checkboxes."""
+    col_sa, col_ca = st.columns(2)
+    with col_sa:
+        if st.button(t("select_all_charts"), key=f"{key_prefix}_sel_all_btn", use_container_width=True):
+            for i in range(len(charts_list)):
+                st.session_state[f"{key_prefix}_cb_{i}"] = True
+            st.rerun()
+    with col_ca:
+        if st.button(t("clear_all_charts"), key=f"{key_prefix}_clr_all_btn", use_container_width=True):
+            for i in range(len(charts_list)):
+                st.session_state[f"{key_prefix}_cb_{i}"] = False
+            st.rerun()
 
     selected = []
     num_cols = min(2, len(charts_list))
     cols = st.columns(num_cols)
     for i, (ci, label) in enumerate(zip(charts_list, labels)):
         with cols[i % num_cols]:
-            if st.checkbox(label, value=True, key=f"{key_prefix}_cb_{i}"):
+            if st.checkbox(label, value=st.session_state.get(f"{key_prefix}_cb_{i}", True), key=f"{key_prefix}_cb_{i}"):
                 selected.append(ci)
     st.caption(t("batch_selected_count", selected=len(selected), total=len(charts_list)))
     return selected
