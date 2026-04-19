@@ -642,12 +642,6 @@ st.divider()
 
 # --- Sidebar with Enhanced Design ---
 with st.sidebar:
-    # Show "Quick Start" title only on landing screen (no file uploaded yet)
-    if "pptx_bytes" not in st.session_state:
-        st.markdown(f"### ⚡ {t('quick_start')}")
-        with st.expander(f"📖 {t('tab_guide')}"):
-            render_user_guide()
-
     st.header(f"📁 {t('upload_section_title')}")
     uploaded_file = st.file_uploader(
         t("upload_label"),
@@ -657,6 +651,12 @@ with st.sidebar:
     )
     if "pptx_bytes" in st.session_state:
         st.warning(t("sidebar_upload_override_warning"))
+
+    # Show "Quick Start" title only on landing screen (no file uploaded yet)
+    if "pptx_bytes" not in st.session_state and uploaded_file is None:
+        st.markdown(f"### ⚡ {t('quick_start')}")
+        with st.expander(f"📖 {t('tab_guide')}"):
+            render_user_guide()
 
     # Show sidebar controls if file is loaded (from sidebar OR wizard uploader)
     if uploaded_file or "pptx_bytes" in st.session_state:
