@@ -1246,6 +1246,26 @@ def _editor_fragment():
 
         st.caption(t("editing_info"))
 
+        # Inline "add column" control — data_editor can't add columns natively
+        with st.expander(f"➕ {t('tab_batch_col')}", expanded=False):
+            _current_df = get_chart_df(selected_chart)
+            add_col_key = f"add_col_{selected_chart.slide_index}_{selected_chart.shape_id}"
+            new_col_name = st.text_input(
+                t("batch_col_caption"),
+                key=f"{add_col_key}_name",
+                placeholder=t("batch_col_caption"),
+                label_visibility="collapsed",
+            ).strip()
+            if st.button(t("batch_col_button"), key=f"{add_col_key}_btn", use_container_width=True):
+                if not new_col_name:
+                    st.warning(t("batch_col_caption"))
+                elif new_col_name in _current_df.columns:
+                    st.warning(t("batch_col_exists_warning", name=new_col_name, count=1))
+                else:
+                    _current_df[new_col_name] = 0
+                    st.session_state.edited_data[selected_chart.key] = _current_df
+                    st.rerun()
+
         _edit_df = get_chart_df(selected_chart)
         # Pin column widths to the original (not edited) frame so typing
         # doesn't resize columns mid-edit and cause visible flicker.
@@ -1260,7 +1280,7 @@ def _editor_fragment():
             else:
                 _col_config[col] = st.column_config.Column(width="large")
 
-        editor_key = f"editor_{selected_chart.slide_index}_{selected_chart.shape_id}"
+        editor_key = f"editor_{selected_chart.slide_index}_{selected_chart.shape_id}_{len(_edit_df.columns)}"
         edited_df = st.data_editor(
             _edit_df,
             num_rows="dynamic",
