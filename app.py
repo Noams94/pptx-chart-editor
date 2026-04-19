@@ -1246,6 +1246,11 @@ def _editor_fragment():
 
         st.caption(t("editing_info"))
 
+        # Revision counter — bumping it invalidates baseline + widget state,
+        # forcing the editor to reseed (used by undo and add-column).
+        rev_slot = f"_editor_rev_{chart_key}"
+        revision = st.session_state.setdefault(rev_slot, 0)
+
         # Inline "add column" control — data_editor can't add columns natively
         with st.expander(f"➕ {t('tab_batch_col')}", expanded=False):
             _current_df = get_chart_df(selected_chart)
@@ -1264,9 +1269,9 @@ def _editor_fragment():
                 else:
                     _current_df[new_col_name] = 0
                     st.session_state.edited_data[selected_chart.key] = _current_df
+                    st.session_state[rev_slot] = revision + 1
                     st.rerun()
 
-        _edit_df = get_chart_df(selected_chart)
         # Pin column widths to the original (not edited) frame so typing
         # doesn't resize columns mid-edit and cause visible flicker.
         _width_df = selected_chart.dataframe
@@ -1280,9 +1285,17 @@ def _editor_fragment():
             else:
                 _col_config[col] = st.column_config.Column(width="large")
 
-        editor_key = f"editor_{selected_chart.slide_index}_{selected_chart.shape_id}_{len(_edit_df.columns)}"
+        # Stable baseline DataFrame for data_editor — if we pass a freshly
+        # built object each run, the editor's internal diff desyncs and
+        # typed values can revert mid-edit.
+        baseline_slot = f"_editor_baseline_{chart_key}_{revision}"
+        if baseline_slot not in st.session_state:
+            st.session_state[baseline_slot] = get_chart_df(selected_chart)
+        baseline_df = st.session_state[baseline_slot]
+
+        editor_key = f"editor_{selected_chart.slide_index}_{selected_chart.shape_id}_{revision}"
         edited_df = st.data_editor(
-            _edit_df,
+            baseline_df,
             num_rows="dynamic",
             use_container_width=True,
             column_config=_col_config,
@@ -1290,11 +1303,13 @@ def _editor_fragment():
             height=350,
         )
 
-        # Push to undo stack if data changed
+        # Push to undo stack only on real value changes
         prev_df = st.session_state.edited_data.get(chart_key)
         if prev_df is not None and not edited_df.equals(prev_df):
             st.session_state.setdefault("undo_stack", []).append((chart_key, prev_df.copy()))
-        st.session_state.edited_data[chart_key] = edited_df
+            st.session_state.edited_data[chart_key] = edited_df
+        elif prev_df is None:
+            st.session_state.edited_data[chart_key] = edited_df
 
         has_unsaved = not edited_df.equals(selected_chart.dataframe)
         if has_unsaved:
@@ -1308,6 +1323,7 @@ def _editor_fragment():
                 if undo_stack:
                     undo_key, undo_df = undo_stack.pop()
                     st.session_state.edited_data[undo_key] = undo_df
+                    st.session_state[rev_slot] = revision + 1
                     st.success(t("undo_success"))
                     st.rerun()
         with c2:
