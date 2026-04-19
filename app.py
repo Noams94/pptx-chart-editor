@@ -873,12 +873,16 @@ if not st.session_state.get("show_step3", False):
                             ci = charts_by_key[chart_key]
                             imported_df = pd.read_excel(xls, sheet_name=sheet_name)
                             expected_cols = len(ci.dataframe.columns)
-                            if len(imported_df.columns) != expected_cols:
+                            if len(imported_df.columns) < expected_cols:
                                 skipped.append(t("excel_column_mismatch_warning",
                                                  sheet=sheet_name, expected=expected_cols,
                                                  found=len(imported_df.columns)))
                             else:
-                                imported_df.columns = ci.dataframe.columns
+                                # Preserve original names for existing columns; keep user-provided names for new ones
+                                imported_df.columns = (
+                                    list(ci.dataframe.columns)
+                                    + list(imported_df.columns[expected_cols:])
+                                )
                                 current_df = get_chart_df(ci)
                                 if not imported_df.equals(current_df):
                                     changed.append((ci, imported_df))
