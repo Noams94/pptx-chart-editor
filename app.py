@@ -661,7 +661,7 @@ with st.sidebar:
     # Show sidebar controls if file is loaded (from sidebar OR wizard uploader)
     if uploaded_file or "pptx_bytes" in st.session_state:
         st.session_state.setdefault("auto_save", True)
-        auto_save_enabled = st.checkbox(
+        st.session_state.auto_save = st.checkbox(
             t("auto_save_label"),
             value=st.session_state.auto_save,
             help=t("auto_save_info"),
