@@ -271,17 +271,14 @@ st.markdown("""
 
     /* Footer */
     .fixed-footer {
-        position: fixed;
-        bottom: 0;
-        left: 0;
         width: 100%;
         background: white;
         border-top: 1px solid #e0e6ed;
         padding: 12px 0;
+        margin-top: 40px;
         text-align: center;
         color: #64748b;
         font-size: 0.85rem;
-        z-index: 999;
         direction: ltr;
     }
     .fixed-footer a {
@@ -294,7 +291,6 @@ st.markdown("""
         color: #1e40af;
         text-decoration: underline;
     }
-    .stApp > .main { padding-bottom: 60px; }
 
     /* Hide Streamlit branding */
     #MainMenu {visibility: hidden;}
