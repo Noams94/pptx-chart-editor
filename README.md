@@ -1,3 +1,14 @@
+---
+title: PPTX Chart Editor
+emoji: 📊
+colorFrom: blue
+colorTo: purple
+sdk: docker
+app_port: 8501
+pinned: false
+short_description: Edit PowerPoint charts with live preview
+---
+
 # PPTX Chart Editor / עורך גרפים
 
 Edit charts in PowerPoint presentations with a live visual preview.
