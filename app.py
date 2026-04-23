@@ -269,29 +269,6 @@ st.markdown("""
         margin: 1rem 0;
     }
 
-    /* Footer */
-    .fixed-footer {
-        width: 100%;
-        background: white;
-        border-top: 1px solid #e0e6ed;
-        padding: 12px 0;
-        margin-top: 40px;
-        text-align: center;
-        color: #64748b;
-        font-size: 0.85rem;
-        direction: ltr;
-    }
-    .fixed-footer a {
-        color: #2563eb;
-        text-decoration: none;
-        font-weight: 600;
-        transition: color 0.2s ease;
-    }
-    .fixed-footer a:hover {
-        color: #1e40af;
-        text-decoration: underline;
-    }
-
     /* Hide Streamlit branding */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
@@ -306,12 +283,6 @@ st.markdown("""
         }
     }
     </style>
-
-    <div class="fixed-footer">
-        &copy; All Rights Reserved &middot; Dr. Noam Keshet &middot;
-        <a href="https://noamkeshet.com" target="_blank">noamkeshet.com</a> &middot;
-        <a href="mailto:keshet.noam@gmail.com">keshet.noam@gmail.com</a>
-    </div>
 """, unsafe_allow_html=True)
 
 
